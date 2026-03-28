@@ -3,7 +3,18 @@ import SwiftTerm
 
 @MainActor
 final class AgentProcessManager {
-    static let claudePath = "/Users/devonmars/.local/bin/claude"
+    static let claudePath: String = {
+        // Try common locations
+        let candidates = [
+            NSHomeDirectory() + "/.local/bin/claude",
+            "/usr/local/bin/claude",
+            "/opt/homebrew/bin/claude",
+        ]
+        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
+            return path
+        }
+        return "claude"
+    }()
 
     func startAgent(
         terminal: LocalProcessTerminalView,
@@ -15,6 +26,13 @@ final class AgentProcessManager {
 
         if let sessionId {
             args.append(contentsOf: ["--resume", sessionId])
+        }
+
+        // Add plugin directory if configured
+        let pluginDir = (UserDefaults.standard.string(forKey: "pluginDirectory") ?? "")
+            .replacingOccurrences(of: "~", with: NSHomeDirectory())
+        if !pluginDir.isEmpty {
+            args.append(contentsOf: ["--plugin-dir", pluginDir])
         }
 
         if let prompt = initialPrompt, !prompt.isEmpty {

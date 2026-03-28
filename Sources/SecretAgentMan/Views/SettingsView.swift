@@ -4,6 +4,7 @@ struct SettingsView: View {
     let terminalManager: TerminalManager
 
     @AppStorage("terminalTheme") private var selectedTheme = "Catppuccin Mocha"
+    @AppStorage("pluginDirectory") private var pluginDirectory = ""
     @State private var searchText = ""
     @State private var allThemes: [String] = []
     @State private var listSelection: String?
@@ -15,6 +16,31 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Section {
+                Text("Claude Plugins")
+                    .font(.headline)
+
+                HStack {
+                    TextField("Plugin directory path", text: $pluginDirectory)
+                        .textFieldStyle(.roundedBorder)
+
+                    Button("Browse...") {
+                        let panel = NSOpenPanel()
+                        panel.canChooseDirectories = true
+                        panel.canChooseFiles = false
+                        if panel.runModal() == .OK, let url = panel.url {
+                            pluginDirectory = url.path
+                        }
+                    }
+                }
+
+                Text("Passed as --plugin-dir to new Claude sessions")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
             Text("Terminal Theme")
                 .font(.headline)
 
