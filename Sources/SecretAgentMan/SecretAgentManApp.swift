@@ -9,10 +9,11 @@ struct SecretAgentManApp: App {
     @State private var fileChanges: [FileChange] = []
     @State private var fullDiff: String = ""
     @State private var diffTimer: Timer?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some Scene {
         WindowGroup("Secret Agent Man") {
-            NavigationSplitView {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
                 SidebarView(store: store, onRemoveAgent: removeAgent)
             } content: {
                 ChangesView(changes: fileChanges, fullDiff: fullDiff)

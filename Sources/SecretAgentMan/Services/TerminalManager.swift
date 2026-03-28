@@ -84,21 +84,28 @@ final class TerminalManager {
             guard terminal.process?.running == true else { continue }
 
             let idle = terminal.secondsSinceMeaningfulData > idleThreshold
-            let hasSubmitted = terminal.userSubmittedAt != nil
+            let currentState = lastStates[agentId] ?? .idle
+
+            // Only go active if user submitted input since we last went idle
+            let userSubmittedSinceIdle: Bool
+            if let submitted = terminal.userSubmittedAt {
+                userSubmittedSinceIdle = !idle && submitted.timeIntervalSinceNow > -terminal.secondsSinceMeaningfulData
+            } else {
+                userSubmittedSinceIdle = false
+            }
 
             let newState: AgentState
             if idle {
-                // No meaningful output for a while — Claude is at the prompt
-                if hasSubmitted {
-                    // User has interacted before, Claude finished
-                    newState = .awaitingInput
+                if currentState == .idle, terminal.secondsSinceMeaningfulData < 15 {
+                    // Startup phase — still loading
+                    newState = .active
                 } else {
-                    // Never submitted — still on startup or just loaded
-                    let startedRecently = terminal.secondsSinceMeaningfulData < 15
-                    newState = startedRecently ? .active : .awaitingInput
+                    newState = .awaitingInput
                 }
+            } else if currentState == .awaitingInput {
+                // Only leave green if user actually pressed Enter
+                newState = userSubmittedSinceIdle ? .active : .awaitingInput
             } else {
-                // Getting meaningful output — Claude is working
                 newState = .active
             }
 
