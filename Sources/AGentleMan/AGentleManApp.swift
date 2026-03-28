@@ -21,7 +21,6 @@ struct AGentleManApp: App {
                 }
             } detail: {
                 ZStack {
-                    // Always present so SwiftUI never destroys/recreates it
                     TerminalPanelView(
                         selectedAgentId: store.selectedAgentId,
                         store: store,
@@ -52,6 +51,10 @@ struct AGentleManApp: App {
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
+
+        Settings {
+            SettingsView(terminalManager: terminalManager)
+        }
     }
 
     private func removeAgent(_ id: UUID) {

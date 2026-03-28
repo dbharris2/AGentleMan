@@ -7,7 +7,7 @@ final class TerminalManager {
     private var delegates: [UUID: TerminalDelegate] = [:]
     private let processManager = AgentProcessManager()
 
-    var themeName: String = "Catppuccin Mocha" {
+    var themeName: String = UserDefaults.standard.string(forKey: "terminalTheme") ?? "Catppuccin Mocha" {
         didSet { applyThemeToAll() }
     }
 
