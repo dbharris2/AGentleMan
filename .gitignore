@@ -1,0 +1,16 @@
+# Xcode
+*.xcodeproj
+xcuserdata/
+DerivedData/
+build/
+*.xcworkspace
+
+# SwiftPM
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Sapling
+.sl/
