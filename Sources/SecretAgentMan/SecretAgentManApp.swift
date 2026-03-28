@@ -11,7 +11,7 @@ struct SecretAgentManApp: App {
     @State private var diffTimer: Timer?
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("Secret Agent Man") {
             NavigationSplitView {
                 SidebarView(store: store, onRemoveAgent: removeAgent)
             } content: {
