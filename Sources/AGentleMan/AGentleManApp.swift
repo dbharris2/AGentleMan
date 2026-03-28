@@ -20,20 +20,22 @@ struct AGentleManApp: App {
                     EmptyStateView()
                 }
             } detail: {
-                if let agent = store.selectedAgent {
+                ZStack {
+                    // Always present so SwiftUI never destroys/recreates it
                     TerminalPanelView(
-                        agent: agent,
-                        terminalManager: terminalManager,
-                        onStateChange: { agentId, state in
-                            store.updateState(id: agentId, state: state)
-                        }
+                        selectedAgentId: store.selectedAgentId,
+                        store: store,
+                        terminalManager: terminalManager
                     )
-                } else {
-                    ContentUnavailableView(
-                        "No Agent",
-                        systemImage: "terminal",
-                        description: Text("Select an agent to start chatting")
-                    )
+                    .opacity(store.selectedAgent != nil ? 1 : 0)
+
+                    if store.selectedAgent == nil {
+                        ContentUnavailableView(
+                            "No Agent",
+                            systemImage: "terminal",
+                            description: Text("Select an agent to start chatting")
+                        )
+                    }
                 }
             }
             .navigationSplitViewStyle(.balanced)

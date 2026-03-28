@@ -1,35 +1,56 @@
 import SwiftTerm
 import SwiftUI
 
+/// A stable container that swaps terminal views when the selected agent changes.
+/// This avoids SwiftUI recreating the NSView on every agent switch.
 struct TerminalPanelView: NSViewRepresentable {
-    let agent: Agent
+    let selectedAgentId: UUID?
+    let store: AgentStore
     let terminalManager: TerminalManager
-    let onStateChange: (UUID, AgentState) -> Void
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView(frame: .zero)
-        let terminal = terminalManager.terminal(for: agent, onStateChange: onStateChange)
-        embedTerminal(terminal, in: container)
-        context.coordinator.currentAgentId = agent.id
+        if let agentId = selectedAgentId, let agent = store.agents.first(where: { $0.id == agentId }) {
+            let terminal = terminalManager.terminal(for: agent, onStateChange: { id, state in
+                Task { @MainActor in store.updateState(id: id, state: state) }
+            })
+            embed(terminal, in: container)
+            context.coordinator.currentAgentId = agentId
+        }
         return container
     }
 
     func updateNSView(_ container: NSView, context: Context) {
-        guard context.coordinator.currentAgentId != agent.id else { return }
+        let newId = selectedAgentId
+        let oldId = context.coordinator.currentAgentId
 
-        // Remove old terminal from container
-        container.subviews.forEach { $0.removeFromSuperview() }
+        guard newId != oldId else { return }
 
-        // Add the new agent's terminal
-        let terminal = terminalManager.terminal(for: agent, onStateChange: onStateChange)
-        embedTerminal(terminal, in: container)
-        context.coordinator.currentAgentId = agent.id
+        // Detach old terminal (don't destroy — TerminalManager keeps it alive)
+        for subview in container.subviews {
+            subview.removeFromSuperview()
+        }
 
-        // Focus the terminal
-        container.window?.makeFirstResponder(terminal)
+        context.coordinator.currentAgentId = newId
+
+        guard let agentId = newId, let agent = store.agents.first(where: { $0.id == agentId }) else {
+            return
+        }
+
+        let terminal = terminalManager.terminal(for: agent, onStateChange: { id, state in
+            Task { @MainActor in store.updateState(id: id, state: state) }
+        })
+        embed(terminal, in: container)
+
+        // Give focus to the new terminal
+        DispatchQueue.main.async {
+            container.window?.makeFirstResponder(terminal)
+        }
     }
 
-    private func embedTerminal(_ terminal: LocalProcessTerminalView, in container: NSView) {
+    private func embed(_ terminal: LocalProcessTerminalView, in container: NSView) {
+        // Remove from previous parent if reparenting
+        terminal.removeFromSuperview()
         terminal.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(terminal)
         NSLayoutConstraint.activate([
