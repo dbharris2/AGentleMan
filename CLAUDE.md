@@ -1,4 +1,4 @@
-# AGentleMan
+# SecretAgentMan
 
 A macOS app for managing multiple Claude Code agent sessions with a Slack-like interface.
 
@@ -17,8 +17,8 @@ just xcode                   # Generates project + opens in Xcode
 
 ## Project Structure
 
-- `Sources/AGentleMan/` - Main app source code
-  - `AGentleManApp.swift` - App entry point with three-column layout
+- `Sources/SecretAgentMan/` - Main app source code
+  - `SecretAgentManApp.swift` - App entry point with three-column layout
   - `Models/` - Data models (Agent, AgentState, FileChange)
   - `Services/` - Process management, diff service, session watcher
   - `ViewModels/` - AgentStore (observable state)

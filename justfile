@@ -1,4 +1,4 @@
-# AGentleMan - macOS Agent Session Manager
+# SecretAgentMan - macOS Agent Session Manager
 
 # List available recipes
 default:
@@ -10,17 +10,17 @@ generate:
 
 # Build the app (regenerates project first)
 build: generate
-    xcodebuild -scheme AGentleMan -configuration Debug build
+    xcodebuild -scheme SecretAgentMan -configuration Debug build
 
 # Run the app (builds first, kills existing instance)
 run: build
-    -pkill -x AGentleMan
-    @open "$( xcodebuild -scheme AGentleMan -configuration Debug -showBuildSettings 2>/dev/null | grep -m1 'BUILT_PRODUCTS_DIR' | awk '{print $3}' )/AGentleMan.app"
+    -pkill -x SecretAgentMan
+    @open "$( xcodebuild -scheme SecretAgentMan -configuration Debug -showBuildSettings 2>/dev/null | grep -m1 'BUILT_PRODUCTS_DIR' | awk '{print $3}' )/SecretAgentMan.app"
 
 # Open the app without rebuilding
 open:
-    -pkill -x AGentleMan
-    @open "$( xcodebuild -scheme AGentleMan -configuration Debug -showBuildSettings 2>/dev/null | grep -m1 'BUILT_PRODUCTS_DIR' | awk '{print $3}' )/AGentleMan.app"
+    -pkill -x SecretAgentMan
+    @open "$( xcodebuild -scheme SecretAgentMan -configuration Debug -showBuildSettings 2>/dev/null | grep -m1 'BUILT_PRODUCTS_DIR' | awk '{print $3}' )/SecretAgentMan.app"
 
 # Run SwiftFormat to auto-fix formatting
 format:
@@ -37,13 +37,13 @@ lint:
 
 # Run unit tests
 test: generate
-    xcodebuild -scheme AGentleMan -configuration Debug -destination 'platform=macOS' test
+    xcodebuild -scheme SecretAgentMan -configuration Debug -destination 'platform=macOS' test
 
 # Clean build artifacts
 clean:
-    xcodebuild -scheme AGentleMan -configuration Debug clean
-    rm -rf ~/Library/Developer/Xcode/DerivedData/AGentleMan-*
+    xcodebuild -scheme SecretAgentMan -configuration Debug clean
+    rm -rf ~/Library/Developer/Xcode/DerivedData/SecretAgentMan-*
 
 # Open project in Xcode
 xcode: generate
-    open AGentleMan.xcodeproj
+    open SecretAgentMan.xcodeproj

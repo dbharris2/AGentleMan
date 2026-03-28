@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct AGentleManApp: App {
+struct SecretAgentManApp: App {
     @State private var store = AgentStore()
     @State private var terminalManager = TerminalManager()
     @State private var diffService = DiffService()

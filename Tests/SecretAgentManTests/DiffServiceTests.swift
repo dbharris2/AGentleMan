@@ -1,4 +1,4 @@
-@testable import AGentleMan
+@testable import SecretAgentMan
 import Testing
 
 @Suite("DiffService")
