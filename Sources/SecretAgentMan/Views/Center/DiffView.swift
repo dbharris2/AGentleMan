@@ -4,14 +4,13 @@ struct DiffView: View {
     let diffText: String
 
     var body: some View {
-        ScrollView([.horizontal, .vertical]) {
+        ScrollView(.vertical) {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(diffText.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
                     diffLine(line)
                 }
             }
             .padding(.vertical, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(nsColor: NSColor(red: 0.11, green: 0.11, blue: 0.13, alpha: 1)))
         .textSelection(.enabled)
