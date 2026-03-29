@@ -44,6 +44,21 @@ struct SettingsView: View {
             Text("Terminal Theme")
                 .font(.headline)
 
+            HStack(spacing: 12) {
+                ThemePreviewLarge(themeName: selectedTheme)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(selectedTheme)
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Current theme")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(10)
+            .background(Color.accentColor.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
             TextField("Search themes...", text: $searchText)
                 .textFieldStyle(.roundedBorder)
 
@@ -82,6 +97,34 @@ struct SettingsView: View {
             }
         }
         .padding(.vertical, 1)
+    }
+}
+
+struct ThemePreviewLarge: View {
+    let themeName: String
+
+    var body: some View {
+        HStack(spacing: 2) {
+            if let theme = GhosttyThemeLoader.load(named: themeName) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(nsColor: theme.background))
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5)
+                    )
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(nsColor: theme.foreground))
+                    .frame(width: 28, height: 28)
+                ForEach([1, 2, 3, 4, 5, 6], id: \.self) { idx in
+                    if let color = theme.palette[idx] {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(nsColor: color))
+                            .frame(width: 28, height: 28)
+                    }
+                }
+            }
+        }
     }
 }
 
