@@ -27,12 +27,17 @@ struct SidebarView: View {
                             }
                     }
                 } header: {
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(group.folder)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary)
+                            .textCase(nil)
+                            .lineLimit(1)
                         if let branch = branchNames[group.folder] {
                             Text(branch)
-                                .font(.system(size: 10))
+                                .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
+                                .textCase(nil)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                         }
