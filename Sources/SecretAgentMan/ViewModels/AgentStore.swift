@@ -72,7 +72,7 @@ final class AgentStore {
     }
 
     var awaitingInputCount: Int {
-        agents.filter { $0.state == .awaitingInput }.count
+        agents.count(where: { $0.state == .awaitingInput })
     }
 
     // MARK: - Persistence

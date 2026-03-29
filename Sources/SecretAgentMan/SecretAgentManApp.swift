@@ -113,7 +113,7 @@ struct SecretAgentManApp: App {
     }
 
     private func refreshBranchNames() {
-        let folders = Set(store.agents.map { $0.folder })
+        let folders = Set(store.agents.map(\.folder))
         for folder in folders {
             Task {
                 let name = await diffService.fetchBranchName(in: folder)

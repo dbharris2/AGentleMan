@@ -90,26 +90,24 @@ final class TerminalManager {
             let currentState = lastStates[agentId] ?? .idle
 
             // Only go active if user submitted input since we last went idle
-            let userSubmittedSinceIdle: Bool
-            if let submitted = terminal.userSubmittedAt {
-                userSubmittedSinceIdle = !idle && submitted.timeIntervalSinceNow > -terminal.secondsSinceMeaningfulData
+            let userSubmittedSinceIdle = if let submitted = terminal.userSubmittedAt {
+                !idle && submitted.timeIntervalSinceNow > -terminal.secondsSinceMeaningfulData
             } else {
-                userSubmittedSinceIdle = false
+                false
             }
 
-            let newState: AgentState
-            if idle {
+            let newState: AgentState = if idle {
                 if currentState == .idle, terminal.secondsSinceMeaningfulData < 15 {
                     // Startup phase — still loading
-                    newState = .active
+                    .active
                 } else {
-                    newState = .awaitingInput
+                    .awaitingInput
                 }
             } else if currentState == .awaitingInput {
                 // Only leave green if user actually pressed Enter
-                newState = userSubmittedSinceIdle ? .active : .awaitingInput
+                userSubmittedSinceIdle ? .active : .awaitingInput
             } else {
-                newState = .active
+                .active
             }
 
             if lastStates[agentId] != newState {
