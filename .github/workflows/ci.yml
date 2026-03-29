@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  SWIFTLINT_VERSION: 0.63.2
+  SWIFTFORMAT_VERSION: 0.59.1
+
+jobs:
+  lint:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: |
+          curl -sL "https://github.com/realm/SwiftLint/releases/download/$SWIFTLINT_VERSION/portable_swiftlint.zip" -o swiftlint.zip
+          unzip -q swiftlint.zip -d swiftlint
+          sudo mv swiftlint/swiftlint /usr/local/bin/
+
+      - name: Install SwiftFormat
+        run: |
+          curl -sL "https://github.com/nicklockwood/SwiftFormat/releases/download/$SWIFTFORMAT_VERSION/swiftformat.zip" -o swiftformat.zip
+          unzip -q swiftformat.zip
+          sudo mv swiftformat /usr/local/bin/
+
+      - name: Run SwiftLint
+        run: swiftlint
+
+      - name: Run SwiftFormat
+        run: swiftformat . --lint
+
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: xcodebuild -scheme SecretAgentMan -configuration Debug build
+
+      - name: Test
+        run: xcodebuild -scheme SecretAgentMan -configuration Debug -destination 'platform=macOS' test

@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version bump
+        id: version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest=$LATEST_TAG"
+
+          COMMITS=$(git log "$LATEST_TAG"..HEAD --pretty=format:"%s" 2>/dev/null || echo "")
+
+          if echo "$COMMITS" | grep -qE '^feat(\(.*\))?!:|BREAKING CHANGE'; then
+            BUMP="major"
+          elif echo "$COMMITS" | grep -qE '^feat(\(.*\))?:'; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          case $BUMP in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+
+          echo "new_version=$MAJOR.$MINOR.$PATCH" >> "$GITHUB_OUTPUT"
+          echo "Bump: $BUMP — $LATEST_TAG → v$MAJOR.$MINOR.$PATCH"
+
+      - name: Create GitHub release
+        run: |
+          gh release create "v${{ steps.version.outputs.new_version }}" \
+            --title "v${{ steps.version.outputs.new_version }}" \
+            --generate-notes \
+            --notes-start-tag "$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")"
+
+          gh release edit "v${{ steps.version.outputs.new_version }}" \
+            --notes "$(gh release view "v${{ steps.version.outputs.new_version }}" --json body -q .body)
+
+          ## Installation
+          1. Download **SecretAgentMan.zip** from the assets below
+          2. Extract the zip and move **SecretAgentMan.app** to your Applications folder
+          3. Before opening, run this in Terminal to remove the quarantine flag:
+             \`\`\`
+             xattr -cr /Applications/SecretAgentMan.app
+             \`\`\`
+          4. Open Secret Agent Man from your Applications folder"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: release
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve dependencies
+        run: xcodebuild -resolvePackageDependencies -scheme SecretAgentMan
+
+      - name: Build Release
+        run: |
+          xcodebuild -scheme SecretAgentMan \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            MARKETING_VERSION=${{ needs.release.outputs.new_version }} \
+            -derivedDataPath build \
+            build
+
+      - name: Zip app bundle
+        run: ditto -c -k --keepParent build/Build/Products/Release/SecretAgentMan.app SecretAgentMan.zip
+
+      - name: Upload to release
+        run: gh release upload "v${{ needs.release.outputs.new_version }}" SecretAgentMan.zip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
