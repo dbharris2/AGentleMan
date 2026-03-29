@@ -9,12 +9,13 @@ struct SecretAgentManApp: App {
     @State private var fileChanges: [FileChange] = []
     @State private var fullDiff: String = ""
     @State private var diffTimer: Timer?
+    @State private var branchNames: [String: String] = [:]
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some Scene {
         WindowGroup("Secret Agent Man") {
             NavigationSplitView(columnVisibility: $columnVisibility) {
-                SidebarView(store: store, onRemoveAgent: removeAgent)
+                SidebarView(store: store, branchNames: branchNames, onRemoveAgent: removeAgent)
             } content: {
                 ChangesView(changes: fileChanges, fullDiff: fullDiff)
             } detail: {
@@ -81,6 +82,21 @@ struct SecretAgentManApp: App {
         diffTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
             Task { @MainActor in
                 refreshDiffs()
+                refreshBranchNames()
+            }
+        }
+    }
+
+    private func refreshBranchNames() {
+        // Deduplicate by folder path
+        let folders = Set(store.agents.map { $0.folder })
+        for folder in folders {
+            Task {
+                let name = await diffService.fetchBranchName(in: folder)
+                let key = folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+                await MainActor.run {
+                    branchNames[key] = name
+                }
             }
         }
     }

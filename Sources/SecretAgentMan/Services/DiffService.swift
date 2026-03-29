@@ -17,6 +17,30 @@ actor DiffService {
         return .none
     }
 
+    func fetchBranchName(in directory: URL) async -> String? {
+        let vcs = detectVCS(in: directory)
+        let raw: String
+        switch vcs {
+        case .jj:
+            raw = await runCommand(
+                "/opt/homebrew/bin/jj",
+                args: [
+                    "log", "-r", "@", "--no-graph", "-T",
+                    "if(description, description.first_line(), change_id.shortest(8))",
+                ],
+                in: directory
+            )
+        case .git:
+            raw = await runCommand("/usr/bin/git", args: ["branch", "--show-current"], in: directory)
+        case .none:
+            return nil
+        }
+
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
     func fetchFullDiff(in directory: URL) async -> String {
         let vcs = detectVCS(in: directory)
         switch vcs {

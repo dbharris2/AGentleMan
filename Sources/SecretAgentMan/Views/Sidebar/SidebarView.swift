@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @Bindable var store: AgentStore
+    var branchNames: [String: String]
     var onRemoveAgent: (UUID) -> Void
     @State private var showingNewAgent = false
     @State private var renamingAgentId: UUID?
@@ -10,7 +11,7 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $store.selectedAgentId) {
             ForEach(store.agentsByFolder, id: \.folder) { group in
-                Section(group.folder) {
+                Section {
                     ForEach(group.agents) { agent in
                         AgentRowView(agent: agent, isSelected: store.selectedAgentId == agent.id)
                             .tag(agent.id)
@@ -24,6 +25,17 @@ struct SidebarView: View {
                                     onRemoveAgent(agent.id)
                                 }
                             }
+                    }
+                } header: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(group.folder)
+                        if let branch = branchNames[group.folder] {
+                            Text(branch)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
                     }
                 }
             }
