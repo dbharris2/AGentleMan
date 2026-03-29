@@ -8,6 +8,7 @@ final class TerminalManager {
     private var processManager = AgentProcessManager()
     private var statusTimer: Timer?
     private var onStateChange: ((UUID, AgentState) -> Void)?
+    var onLaunched: ((UUID) -> Void)?
     private var lastStates: [UUID: AgentState] = [:]
 
     /// Seconds of no output before considering agent idle (ready for input).
@@ -57,11 +58,13 @@ final class TerminalManager {
             terminal: terminal,
             folder: agent.folder,
             initialPrompt: agent.initialPrompt,
-            sessionId: agent.sessionId
+            sessionId: agent.sessionId,
+            hasLaunched: agent.hasLaunched
         )
 
         lastStates[agent.id] = .active
         onStateChange(agent.id, .active)
+        onLaunched?(agent.id)
 
         return terminal
     }

@@ -68,6 +68,9 @@ struct SecretAgentManApp: App {
                 terminalManager.startMonitoring { id, state in
                     store.updateState(id: id, state: state)
                 }
+                terminalManager.onLaunched = { id in
+                    store.markLaunched(id: id)
+                }
             }
             .onDisappear {
                 diffTimer?.invalidate()

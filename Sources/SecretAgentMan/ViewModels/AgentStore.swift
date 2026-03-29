@@ -30,7 +30,7 @@ final class AgentStore {
     }
 
     func addAgent(name: String, folder: URL, initialPrompt: String? = nil) -> Agent {
-        let agent = Agent(name: name, folder: folder, initialPrompt: initialPrompt)
+        let agent = Agent(name: name, folder: folder, sessionId: UUID().uuidString, initialPrompt: initialPrompt)
         agents.append(agent)
         selectedAgentId = agent.id
         save()
@@ -48,6 +48,12 @@ final class AgentStore {
     func renameAgent(id: UUID, name: String) {
         guard let index = agents.firstIndex(where: { $0.id == id }) else { return }
         agents[index].name = name
+        save()
+    }
+
+    func markLaunched(id: UUID) {
+        guard let index = agents.firstIndex(where: { $0.id == id }) else { return }
+        agents[index].hasLaunched = true
         save()
     }
 

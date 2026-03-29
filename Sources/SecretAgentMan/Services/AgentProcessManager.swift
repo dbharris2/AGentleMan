@@ -20,12 +20,17 @@ final class AgentProcessManager {
         terminal: LocalProcessTerminalView,
         folder: URL,
         initialPrompt: String? = nil,
-        sessionId: String? = nil
+        sessionId: String? = nil,
+        hasLaunched: Bool = false
     ) {
         var args: [String] = []
 
         if let sessionId {
-            args.append(contentsOf: ["--resume", sessionId])
+            if hasLaunched {
+                args.append(contentsOf: ["--resume", sessionId])
+            } else {
+                args.append(contentsOf: ["--session-id", sessionId])
+            }
         }
 
         // Add plugin directory if configured
