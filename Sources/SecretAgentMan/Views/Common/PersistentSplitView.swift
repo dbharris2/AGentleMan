@@ -20,6 +20,9 @@ struct PersistentSplitView<Top: View, Bottom: View>: NSViewRepresentable {
         splitView.addSubview(topHost)
         splitView.addSubview(bottomHost)
 
+        context.coordinator.topHost = topHost
+        context.coordinator.bottomHost = bottomHost
+
         splitView.delegate = context.coordinator
         context.coordinator.topMinHeight = topMinHeight
         context.coordinator.bottomMinHeight = bottomMinHeight
@@ -28,13 +31,9 @@ struct PersistentSplitView<Top: View, Bottom: View>: NSViewRepresentable {
         return splitView
     }
 
-    func updateNSView(_ splitView: NSSplitView, context: Context) {
-        if let topHost = splitView.subviews.first as? NSHostingView<Top> {
-            topHost.rootView = top()
-        }
-        if let bottomHost = splitView.subviews.last as? NSHostingView<Bottom> {
-            bottomHost.rootView = bottom()
-        }
+    func updateNSView(_: NSSplitView, context: Context) {
+        context.coordinator.topHost?.rootView = top()
+        context.coordinator.bottomHost?.rootView = bottom()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -42,6 +41,8 @@ struct PersistentSplitView<Top: View, Bottom: View>: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, NSSplitViewDelegate {
+        var topHost: NSHostingView<Top>?
+        var bottomHost: NSHostingView<Bottom>?
         var topMinHeight: CGFloat = 100
         var bottomMinHeight: CGFloat = 100
         var defaultTopFraction: CGFloat = 0.7
