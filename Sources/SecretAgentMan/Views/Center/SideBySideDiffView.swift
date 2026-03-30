@@ -39,11 +39,11 @@ struct SideBySideDiffView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.cyan.opacity(0.06))
 
-                    case let .pair(left, right):
+                    case let .pair(left, right, lang):
                         HStack(spacing: 0) {
-                            sideCell(left, fg: fg)
+                            sideCell(left, lang: lang, fg: fg)
                             Divider()
-                            sideCell(right, fg: fg)
+                            sideCell(right, lang: lang, fg: fg)
                         }
                     }
                 }
@@ -55,7 +55,7 @@ struct SideBySideDiffView: View {
     }
 
     @ViewBuilder
-    private func sideCell(_ cell: SideCell, fg: NSColor?) -> some View {
+    private func sideCell(_ cell: SideCell, lang: String?, fg: NSColor?) -> some View {
         let contextColor = Color(nsColor: fg ?? .labelColor).opacity(0.6)
 
         let bgColor = switch cell.kind {
@@ -64,19 +64,31 @@ struct SideBySideDiffView: View {
         case .context, .empty: Color.clear
         }
 
-        let fgColor = switch cell.kind {
+        let fallbackColor = switch cell.kind {
         case .added: Color(nsColor: .systemGreen)
         case .removed: Color(nsColor: .systemRed)
         case .context: contextColor
         case .empty: Color.clear
         }
 
-        Text(cell.text.isEmpty ? " " : cell.text)
-            .font(.system(size: 12, design: .monospaced))
-            .foregroundStyle(fgColor)
-            .padding(.horizontal, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(bgColor)
+        if cell.kind == .empty {
+            Text(" ")
+                .font(.system(size: 12, design: .monospaced))
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if let highlighted = SyntaxHighlighter.highlight(cell.text, language: lang) {
+            Text(highlighted)
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(bgColor)
+        } else {
+            Text(cell.text.isEmpty ? " " : cell.text)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(fallbackColor)
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(bgColor)
+        }
     }
 }
 
@@ -85,7 +97,7 @@ struct SideBySideDiffView: View {
 private enum DiffRow {
     case fileHeader(String)
     case hunkHeader(String)
-    case pair(SideCell, SideCell)
+    case pair(SideCell, SideCell, lang: String?)
 }
 
 private struct SideCell {
@@ -102,6 +114,7 @@ private struct SideCell {
 private func parseSideBySide(_ diff: String) -> [DiffRow] {
     var rows: [DiffRow] = []
     let lines = diff.components(separatedBy: "\n")
+    var currentLang: String?
 
     var removedBuffer: [String] = []
     var addedBuffer: [String] = []
@@ -115,7 +128,7 @@ private func parseSideBySide(_ diff: String) -> [DiffRow] {
             let right = i < addedBuffer.count
                 ? SideCell(text: addedBuffer[i], kind: .added)
                 : SideCell.blank
-            rows.append(.pair(left, right))
+            rows.append(.pair(left, right, lang: currentLang))
         }
         removedBuffer.removeAll()
         addedBuffer.removeAll()
@@ -124,6 +137,9 @@ private func parseSideBySide(_ diff: String) -> [DiffRow] {
     for line in lines {
         if line.hasPrefix("diff --git") {
             flushBuffers()
+            if let ext = SyntaxHighlighter.extensionFromDiffHeader(line) {
+                currentLang = SyntaxHighlighter.language(forExtension: ext)
+            }
             rows.append(.fileHeader(line))
         } else if line.hasPrefix("@@") {
             flushBuffers()
@@ -139,7 +155,7 @@ private func parseSideBySide(_ diff: String) -> [DiffRow] {
             flushBuffers()
             let text = line.hasPrefix(" ") ? String(line.dropFirst()) : line
             let cell = SideCell(text: text, kind: .context)
-            rows.append(.pair(cell, cell))
+            rows.append(.pair(cell, cell, lang: currentLang))
         }
     }
 

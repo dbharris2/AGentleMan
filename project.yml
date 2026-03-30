@@ -19,6 +19,9 @@ packages:
   MarkdownUI:
     url: https://github.com/gonzalezreal/swift-markdown-ui
     from: 2.4.0
+  Highlightr:
+    url: https://github.com/raspu/Highlightr
+    from: 2.3.0
 
 targets:
   SecretAgentMan:
@@ -41,6 +44,7 @@ targets:
     dependencies:
       - package: SwiftTerm
       - package: MarkdownUI
+      - package: Highlightr
     scheme:
       testTargets:
         - SecretAgentManTests
