@@ -16,6 +16,8 @@ struct SecretAgentManApp: App {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var activityMode: ActivityMode = .agents
     @State private var selectedPlanURL: URL?
+    @AppStorage("shellPanelVisible") private var isShellPanelVisible = false
+    @AppStorage("shellPanelHeight") private var shellPanelHeight: Double = 200
 
     var body: some Scene {
         WindowGroup("Secret Agent Man") {
@@ -30,44 +32,56 @@ struct SecretAgentManApp: App {
                         selectedPlanURL: $selectedPlanURL
                     )
                 } content: {
-                    switch activityMode {
-                    case .agents:
-                        ChangesView(changes: fileChanges, fullDiff: fullDiff)
-                    case .plans:
-                        if let url = selectedPlanURL {
-                            PlanDetailView(url: url)
-                        } else {
-                            ContentUnavailableView(
-                                "No Plan Selected",
-                                systemImage: "doc.text",
-                                description: Text("Select a plan from the sidebar")
-                            )
+                    ZStack(alignment: .bottom) {
+                        switch activityMode {
+                        case .agents:
+                            ChangesView(changes: fileChanges, fullDiff: fullDiff)
+                        case .plans:
+                            if let url = selectedPlanURL {
+                                PlanDetailView(url: url)
+                            } else {
+                                ContentUnavailableView(
+                                    "No Plan Selected",
+                                    systemImage: "doc.text",
+                                    description: Text("Select a plan from the sidebar")
+                                )
+                            }
+                        }
+
+                        if isShellPanelVisible {
+                            VStack(spacing: 0) {
+                                Rectangle()
+                                    .fill(Color.accentColor.opacity(0.6))
+                                    .frame(height: 3)
+                                    .contentShape(Rectangle().size(width: 1000, height: 12))
+                                    .gesture(
+                                        DragGesture()
+                                            .onChanged { value in
+                                                shellPanelHeight = max(100, shellPanelHeight - value.translation.height)
+                                            }
+                                    )
+                                    .onHover { hovering in
+                                        if hovering {
+                                            NSCursor.resizeUpDown.push()
+                                        } else {
+                                            NSCursor.pop()
+                                        }
+                                    }
+                                ShellPanelView(
+                                    selectedAgentId: store.selectedAgentId,
+                                    store: store,
+                                    shellManager: shellManager
+                                )
+                            }
+                            .frame(height: shellPanelHeight)
                         }
                     }
                 } detail: {
-                    PersistentSplitView(
-                        autosaveName: "TerminalSplit",
-                        topMinHeight: 200,
-                        bottomMinHeight: 100,
-                        defaultTopFraction: 0.7
-                    ) {
-                        TerminalPanelView(
-                            selectedAgentId: store.selectedAgentId,
-                            store: store,
-                            terminalManager: terminalManager
-                        )
-                    } bottom: {
-                        VStack(spacing: 0) {
-                            Rectangle()
-                                .fill(Color.accentColor.opacity(0.6))
-                                .frame(height: 3)
-                            ShellPanelView(
-                                selectedAgentId: store.selectedAgentId,
-                                store: store,
-                                shellManager: shellManager
-                            )
-                        }
-                    }
+                    TerminalPanelView(
+                        selectedAgentId: store.selectedAgentId,
+                        store: store,
+                        terminalManager: terminalManager
+                    )
                 }
                 .navigationSplitViewStyle(.balanced)
                 .frame(minWidth: 900, minHeight: 600)
@@ -111,7 +125,8 @@ struct SecretAgentManApp: App {
                 StatusBarView(
                     mode: $activityMode,
                     store: store,
-                    branchNames: branchNames
+                    branchNames: branchNames,
+                    isShellPanelVisible: $isShellPanelVisible
                 )
             } // VStack
         }
@@ -122,6 +137,12 @@ struct SecretAgentManApp: App {
             SettingsView(terminalManager: terminalManager, shellManager: shellManager)
         }
         .commands {
+            CommandMenu("View") {
+                Button(isShellPanelVisible ? "Hide Terminal" : "Show Terminal") {
+                    isShellPanelVisible.toggle()
+                }
+                .keyboardShortcut("j")
+            }
             CommandMenu("Agents") {
                 let orderedAgents = store.agentsByFolder.flatMap(\.agents)
                 ForEach(Array(orderedAgents.prefix(9).enumerated()), id: \.element.id) { index, agent in

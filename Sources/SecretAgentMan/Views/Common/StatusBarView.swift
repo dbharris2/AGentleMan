@@ -4,6 +4,7 @@ struct StatusBarView: View {
     @Binding var mode: ActivityMode
     @Bindable var store: AgentStore
     var branchNames: [String: String]
+    @Binding var isShellPanelVisible: Bool
 
     @State private var showingMCPPopover = false
     @State private var showingPluginsPopover = false
@@ -81,7 +82,22 @@ struct StatusBarView: View {
 
             Spacer()
 
-            // Right: agent info
+            // Right: terminal toggle + agent info
+            Button {
+                isShellPanelVisible.toggle()
+            } label: {
+                Image(systemName: "terminal")
+                    .font(.system(size: 11))
+                    .foregroundStyle(isShellPanelVisible ? Color.accentColor : .secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Toggle Terminal (Cmd+J)")
+
+            Divider()
+                .frame(height: 16)
+                .padding(.horizontal, 8)
+
+            // Agent info
             if let agent = selectedAgent {
                 HStack(spacing: 8) {
                     if let branch = branchNames[agent.folderPath] {
