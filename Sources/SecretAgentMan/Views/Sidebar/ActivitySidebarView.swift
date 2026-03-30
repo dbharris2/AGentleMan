@@ -9,6 +9,7 @@ struct ActivitySidebarView: View {
     @Binding var mode: ActivityMode
     @Bindable var store: AgentStore
     var branchNames: [String: String]
+    var prInfos: [String: PRInfo]
     var onRemoveAgent: (UUID) -> Void
     @Binding var selectedPlanURL: URL?
 
@@ -30,7 +31,7 @@ struct ActivitySidebarView: View {
             Group {
                 switch mode {
                 case .agents:
-                    SidebarView(store: store, branchNames: branchNames, onRemoveAgent: onRemoveAgent)
+                    SidebarView(store: store, branchNames: branchNames, prInfos: prInfos, onRemoveAgent: onRemoveAgent)
                 case .plans:
                     PlanListView(selectedPlanURL: $selectedPlanURL)
                 }

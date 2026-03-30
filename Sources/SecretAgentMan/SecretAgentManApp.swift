@@ -9,7 +9,10 @@ struct SecretAgentManApp: App {
     @State private var fileChanges: [FileChange] = []
     @State private var fullDiff: String = ""
     @State private var diffTimer: Timer?
+    @State private var prTimer: Timer?
     @State private var branchNames: [String: String] = [:]
+    @State private var prInfos: [String: PRInfo] = [:]
+    @State private var prService = PRService()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var activityMode: ActivityMode = .agents
     @State private var selectedPlanURL: URL?
@@ -21,6 +24,7 @@ struct SecretAgentManApp: App {
                     mode: $activityMode,
                     store: store,
                     branchNames: branchNames,
+                    prInfos: prInfos,
                     onRemoveAgent: removeAgent,
                     selectedPlanURL: $selectedPlanURL
                 )
@@ -73,6 +77,7 @@ struct SecretAgentManApp: App {
             }
             .onAppear {
                 startDiffPolling()
+                startPRPolling()
                 terminalManager.startMonitoring { id, state in
                     store.updateState(id: id, state: state)
                 }
@@ -82,6 +87,7 @@ struct SecretAgentManApp: App {
             }
             .onDisappear {
                 diffTimer?.invalidate()
+                prTimer?.invalidate()
                 terminalManager.stopMonitoring()
             }
         }
@@ -111,6 +117,10 @@ struct SecretAgentManApp: App {
         store.removeAgent(id: id)
     }
 
+    private static func folderKey(_ folder: URL) -> String {
+        folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+    }
+
     private func startDiffPolling() {
         diffTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
             Task { @MainActor in
@@ -120,14 +130,50 @@ struct SecretAgentManApp: App {
         }
     }
 
-    private func refreshBranchNames() {
+    private func startPRPolling() {
+        refreshPRStatuses()
+        prTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+            Task { @MainActor in
+                refreshPRStatuses()
+            }
+        }
+    }
+
+    private func refreshPRStatuses() {
         let folders = Set(store.agents.map(\.folder))
         for folder in folders {
             Task {
-                let name = await diffService.fetchBranchName(in: folder)
-                let key = folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+                let info = await prService.fetchPRInfo(in: folder)
+                let key = Self.folderKey(folder)
                 await MainActor.run {
-                    branchNames[key] = name
+                    if prInfos[key] != info {
+                        if let info {
+                            prInfos[key] = info
+                        } else {
+                            prInfos.removeValue(forKey: key)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func refreshBranchNames() {
+        let folders = Set(store.agents.map(\.folder))
+        var anyChanged = false
+        for folder in folders {
+            Task {
+                let name = await diffService.fetchBranchName(in: folder)
+                let key = Self.folderKey(folder)
+                await MainActor.run {
+                    if branchNames[key] != name {
+                        branchNames[key] = name
+                        if !anyChanged {
+                            anyChanged = true
+                            // Defer PR refresh until next run loop tick to batch changes
+                            DispatchQueue.main.async { refreshPRStatuses() }
+                        }
+                    }
                 }
             }
         }

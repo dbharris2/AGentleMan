@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarView: View {
     @Bindable var store: AgentStore
     var branchNames: [String: String]
+    var prInfos: [String: PRInfo]
     var onRemoveAgent: (UUID) -> Void
     @State private var showingNewAgent = false
     @State private var renamingAgentId: UUID?
@@ -47,17 +48,65 @@ struct SidebarView: View {
                             Text(group.folder)
                                 .font(.system(size: 13))
                                 .foregroundStyle(.primary)
-                                .textCase(nil)
                                 .lineLimit(1)
                             if let branch = branchNames[group.folder] {
                                 Text(branch)
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
-                                    .textCase(nil)
                                     .lineLimit(1)
                                     .truncationMode(.tail)
                             }
+                            if let pr = prInfos[group.folder] {
+                                HStack(spacing: 6) {
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(pr.state.color)
+                                        .frame(width: 3, height: 14)
+                                    Link(destination: pr.url) {
+                                        Text(verbatim: "#\(pr.number)")
+                                    }
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.blue)
+                                    Text(verbatim: "+\(pr.additions)")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.green)
+                                    Text(verbatim: "-\(pr.deletions)")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.red)
+                                    Text(verbatim: "@\(pr.changedFiles)")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                    if pr.commentCount > 0 {
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "bubble.left")
+                                                .font(.system(size: 9))
+                                            Text(verbatim: "\(pr.commentCount)")
+                                                .font(.system(size: 10))
+                                        }
+                                        .foregroundStyle(.secondary)
+                                    }
+                                    if pr.checkStatus != .none {
+                                        Image(systemName: "flask.fill")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(pr.checkStatus.color)
+                                            .help(pr.checkStatus.label)
+                                    }
+                                    ForEach(pr.reviewers, id: \.self) { reviewer in
+                                        AsyncImage(url: reviewer.avatarURL) { image in
+                                            image.resizable()
+                                        } placeholder: {
+                                            Text(verbatim: String(reviewer.login.prefix(2)))
+                                                .font(.system(size: 8, weight: .medium))
+                                                .foregroundStyle(.white)
+                                        }
+                                        .frame(width: 18, height: 18)
+                                        .background(Color.secondary.opacity(0.6))
+                                        .clipShape(Circle())
+                                        .help(reviewer.login)
+                                    }
+                                }
+                            }
                         }
+                        .textCase(nil)
                     }
                 }
             }
