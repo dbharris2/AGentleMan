@@ -38,6 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Swift version
+        run: swift --version && xcodebuild -version
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
