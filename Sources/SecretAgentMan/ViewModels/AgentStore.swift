@@ -62,11 +62,6 @@ final class AgentStore {
         agents[index].state = state
     }
 
-    func updatePid(id: UUID, pid: Int32) {
-        guard let index = agents.firstIndex(where: { $0.id == id }) else { return }
-        agents[index].pid = pid
-    }
-
     var hasActiveAgents: Bool {
         agents.contains { $0.state == .active || $0.state == .awaitingInput }
     }
@@ -94,7 +89,6 @@ final class AgentStore {
         // Reset transient state — processes aren't running after restart
         for i in loaded.indices {
             loaded[i].state = .idle
-            loaded[i].pid = nil
         }
 
         agents = loaded

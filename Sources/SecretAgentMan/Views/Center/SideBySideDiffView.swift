@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SideBySideDiffView: View {
     let diffText: String
-    @AppStorage("terminalTheme") private var themeName = "Catppuccin Mocha"
+    @AppStorage(UserDefaultsKeys.terminalTheme) private var themeName = "Catppuccin Mocha"
 
     private var theme: GhosttyTheme? {
         GhosttyThemeLoader.load(named: themeName)

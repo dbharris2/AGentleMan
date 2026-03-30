@@ -6,7 +6,6 @@ struct Agent: Identifiable, Hashable, Codable {
     var folder: URL
     var state: AgentState
     var sessionId: String?
-    var pid: Int32?
     var initialPrompt: String?
     var hasLaunched: Bool
     var createdAt: Date
@@ -25,7 +24,6 @@ struct Agent: Identifiable, Hashable, Codable {
         folder: URL,
         state: AgentState = .idle,
         sessionId: String? = nil,
-        pid: Int32? = nil,
         initialPrompt: String? = nil,
         hasLaunched: Bool = false,
         createdAt: Date = Date()
@@ -35,7 +33,6 @@ struct Agent: Identifiable, Hashable, Codable {
         self.folder = folder
         self.state = state
         self.sessionId = sessionId
-        self.pid = pid
         self.initialPrompt = initialPrompt
         self.hasLaunched = hasLaunched
         self.createdAt = createdAt
@@ -48,13 +45,8 @@ struct Agent: Identifiable, Hashable, Codable {
         folder = try container.decode(URL.self, forKey: .folder)
         state = try container.decode(AgentState.self, forKey: .state)
         sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
-        pid = try container.decodeIfPresent(Int32.self, forKey: .pid)
         initialPrompt = try container.decodeIfPresent(String.self, forKey: .initialPrompt)
         hasLaunched = try container.decodeIfPresent(Bool.self, forKey: .hasLaunched) ?? false
         createdAt = try container.decode(Date.self, forKey: .createdAt)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, name, folder, state, sessionId, pid, initialPrompt, hasLaunched, createdAt
     }
 }

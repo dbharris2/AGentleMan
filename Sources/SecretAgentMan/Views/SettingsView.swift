@@ -4,8 +4,8 @@ struct SettingsView: View {
     let terminalManager: TerminalManager
     let shellManager: ShellManager
 
-    @AppStorage("terminalTheme") private var selectedTheme = "Catppuccin Mocha"
-    @AppStorage("pluginDirectory") private var pluginDirectory = ""
+    @AppStorage(UserDefaultsKeys.terminalTheme) private var selectedTheme = "Catppuccin Mocha"
+    @AppStorage(UserDefaultsKeys.pluginDirectory) private var pluginDirectory = ""
     @State private var searchText = ""
     @State private var allThemes: [String] = []
     @State private var listSelection: String?

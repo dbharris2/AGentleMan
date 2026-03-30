@@ -6,7 +6,7 @@ import SwiftTerm
 @MainActor
 final class ShellManager {
     private var terminals: [UUID: LocalProcessTerminalView] = [:]
-    var themeName: String = UserDefaults.standard.string(forKey: "terminalTheme") ?? "Catppuccin Mocha" {
+    var themeName: String = UserDefaults.standard.string(forKey: UserDefaultsKeys.terminalTheme) ?? "Catppuccin Mocha" {
         didSet { applyThemeToAll() }
     }
 
@@ -73,19 +73,6 @@ final class ShellManager {
 
     private func applyTheme(to terminal: LocalProcessTerminalView) {
         guard let theme = GhosttyThemeLoader.load(named: themeName) else { return }
-        terminal.nativeBackgroundColor = theme.background
-        terminal.nativeForegroundColor = theme.foreground
-        terminal.caretColor = theme.cursorColor
-        terminal.selectedTextBackgroundColor = theme.selectionBackground
-
-        let colors = theme.swiftTermColors.map { nsColor -> SwiftTerm.Color in
-            guard let c = nsColor.usingColorSpace(.deviceRGB) else {
-                return SwiftTerm.Color(red: 32768, green: 32768, blue: 32768)
-            }
-            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-            c.getRed(&r, green: &g, blue: &b, alpha: &a)
-            return SwiftTerm.Color(red: UInt16(r * 65535), green: UInt16(g * 65535), blue: UInt16(b * 65535))
-        }
-        terminal.installColors(colors)
+        TerminalTheming.applyTheme(theme, to: terminal)
     }
 }

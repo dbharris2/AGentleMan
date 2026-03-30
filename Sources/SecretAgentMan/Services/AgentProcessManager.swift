@@ -34,7 +34,7 @@ final class AgentProcessManager {
         }
 
         // Add plugin directory if configured
-        let pluginDir = (UserDefaults.standard.string(forKey: "pluginDirectory") ?? "")
+        let pluginDir = (UserDefaults.standard.string(forKey: UserDefaultsKeys.pluginDirectory) ?? "")
             .replacingOccurrences(of: "~", with: NSHomeDirectory())
         if !pluginDir.isEmpty {
             args.append(contentsOf: ["--plugin-dir", pluginDir])

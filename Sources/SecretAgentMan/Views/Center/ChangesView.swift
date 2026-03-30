@@ -5,7 +5,7 @@ struct ChangesView: View {
     let fullDiff: String
 
     @State private var selectedFile: String?
-    @AppStorage("diffViewMode") private var diffMode: String = "unified"
+    @AppStorage(UserDefaultsKeys.diffViewMode) private var diffMode: String = "unified"
 
     private var visibleDiff: String {
         guard let selected = selectedFile else { return fullDiff }
