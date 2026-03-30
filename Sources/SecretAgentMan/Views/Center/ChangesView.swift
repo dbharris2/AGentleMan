@@ -54,7 +54,7 @@ struct ChangesView: View {
     }
 
     private var fileList: some View {
-        List(selection: $selectedFile) {
+        List {
             Section {
                 ForEach(changes) { change in
                     HStack(spacing: 8) {
@@ -83,8 +83,20 @@ struct ChangesView: View {
                             }
                         }
                     }
-                    .tag(change.path)
                     .padding(.vertical, 2)
+                    .listRowBackground(
+                        selectedFile == change.path
+                            ? Color.accentColor.opacity(0.2)
+                            : Color.clear
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if selectedFile == change.path {
+                            selectedFile = nil
+                        } else {
+                            selectedFile = change.path
+                        }
+                    }
                 }
             } header: {
                 HStack {
