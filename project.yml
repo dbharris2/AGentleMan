@@ -30,6 +30,9 @@ targets:
     sources:
       - path: Sources/SecretAgentMan
       - path: Resources/Assets.xcassets
+      - path: Resources/Themes
+        buildPhase: resources
+        type: folder
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.secretagentman.app
       INFOPLIST_FILE: Resources/Info.plist

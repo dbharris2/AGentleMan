@@ -21,14 +21,17 @@ struct GhosttyTheme {
 }
 
 enum GhosttyThemeLoader {
-    static let themesDirectory = "/Applications/Ghostty.app/Contents/Resources/ghostty/themes"
+    private static let bundledThemesURL: URL? = Bundle.main.url(forResource: "Themes", withExtension: nil)
+    private static let ghosttyThemesPath = "/Applications/Ghostty.app/Contents/Resources/ghostty/themes"
 
     /// In-memory cache to avoid repeated disk reads during SwiftUI re-renders.
     private nonisolated(unsafe) static var cache: [String: GhosttyTheme] = [:]
 
     static func availableThemes() -> [String] {
         let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(atPath: themesDirectory) else {
+        // Prefer bundled themes, fall back to Ghostty installation
+        let dir = bundledThemesURL?.path ?? ghosttyThemesPath
+        guard let entries = try? fm.contentsOfDirectory(atPath: dir) else {
             return []
         }
         return entries.sorted()
@@ -38,7 +41,14 @@ enum GhosttyThemeLoader {
         if let cached = cache[name] {
             return cached
         }
-        let path = "\(themesDirectory)/\(name)"
+        // Try bundled themes first, then Ghostty installation
+        let bundledPath = bundledThemesURL?.appendingPathComponent(name).path
+        let ghosttyPath = "\(ghosttyThemesPath)/\(name)"
+        let path = if let bundledPath, FileManager.default.fileExists(atPath: bundledPath) {
+            bundledPath
+        } else {
+            ghosttyPath
+        }
         guard let contents = try? String(contentsOfFile: path, encoding: .utf8) else {
             return nil
         }
