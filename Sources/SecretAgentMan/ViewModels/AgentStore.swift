@@ -99,7 +99,13 @@ final class AgentStore {
         }
 
         agents = loaded
-        selectedAgentId = agents.first?.id
+        if let saved = UserDefaults.standard.string(forKey: "selectedAgentId"),
+           let savedId = UUID(uuidString: saved),
+           agents.contains(where: { $0.id == savedId }) {
+            selectedAgentId = savedId
+        } else {
+            selectedAgentId = agents.first?.id
+        }
 
         if needsSave {
             save()

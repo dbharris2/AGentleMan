@@ -62,6 +62,9 @@ struct SecretAgentManApp: App {
             .frame(minWidth: 900, minHeight: 600)
             .onChange(of: store.selectedAgentId) {
                 refreshDiffs()
+                if let id = store.selectedAgentId {
+                    UserDefaults.standard.set(id.uuidString, forKey: "selectedAgentId")
+                }
             }
             .onAppear {
                 startDiffPolling()
