@@ -1,8 +1,10 @@
 import Foundation
+import OSLog
 import SwiftTerm
 
 @MainActor
 final class AgentProcessManager {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.secretagentman", category: "AgentProcess")
     static let claudePath: String = {
         // Try common locations
         let candidates = [
@@ -28,9 +30,13 @@ final class AgentProcessManager {
         if let sessionId {
             if hasLaunched {
                 args.append(contentsOf: ["--resume", sessionId])
+                Self.logger.info("Resuming session \(sessionId)")
             } else {
                 args.append(contentsOf: ["--session-id", sessionId])
+                Self.logger.info("Starting new session \(sessionId)")
             }
+        } else {
+            Self.logger.warning("No session ID — session will not be resumable")
         }
 
         // Add plugin directory if configured
@@ -45,6 +51,11 @@ final class AgentProcessManager {
         }
 
         let env = currentEnvironment()
+
+        Self.logger
+            .info(
+                "Launching claude: \(Self.claudePath) \(args.joined(separator: " ")) | cwd=\(folder.path) hasLaunched=\(hasLaunched) sessionId=\(sessionId ?? "nil") prompt=\(initialPrompt != nil ? "yes" : "nil")"
+            )
 
         terminal.startProcess(
             executable: Self.claudePath,

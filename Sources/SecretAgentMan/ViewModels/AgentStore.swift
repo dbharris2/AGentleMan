@@ -87,11 +87,22 @@ final class AgentStore {
         else { return }
 
         // Reset transient state — processes aren't running after restart
+        var needsSave = false
         for i in loaded.indices {
             loaded[i].state = .idle
+            // Backfill sessionId for agents created before session persistence was added
+            if loaded[i].sessionId == nil {
+                loaded[i].sessionId = UUID().uuidString
+                loaded[i].hasLaunched = false
+                needsSave = true
+            }
         }
 
         agents = loaded
         selectedAgentId = agents.first?.id
+
+        if needsSave {
+            save()
+        }
     }
 }

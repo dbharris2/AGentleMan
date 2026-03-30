@@ -57,7 +57,7 @@ final class TerminalManager {
         processManager.startAgent(
             terminal: terminal,
             folder: agent.folder,
-            initialPrompt: agent.initialPrompt,
+            initialPrompt: agent.hasLaunched ? nil : agent.initialPrompt,
             sessionId: agent.sessionId,
             hasLaunched: agent.hasLaunched
         )
