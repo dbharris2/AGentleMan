@@ -70,6 +70,11 @@ struct SecretAgentManApp: App {
             }
             .navigationSplitViewStyle(.balanced)
             .frame(minWidth: 900, minHeight: 600)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    VersionBadgeView()
+                }
+            }
             .onChange(of: store.selectedAgentId) {
                 refreshDiffs()
                 if let id = store.selectedAgentId {
