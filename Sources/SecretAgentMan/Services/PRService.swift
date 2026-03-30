@@ -52,7 +52,7 @@ actor PRService {
         return nil
     }
 
-    private func parsePRInfo(from json: String) -> PRInfo? {
+    func parsePRInfo(from json: String) -> PRInfo? {
         guard let data = json.data(using: .utf8),
               let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
               let first = array.first,

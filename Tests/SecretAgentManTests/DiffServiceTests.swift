@@ -44,4 +44,86 @@ struct DiffServiceTests {
         let changes = await service.parseChanges(from: "")
         #expect(changes.isEmpty)
     }
+
+    @Test
+    func parsesDeletedFile() async {
+        let diff = """
+        diff --git a/src/old.ts b/src/old.ts
+        deleted file mode 100644
+        --- a/src/old.ts
+        +++ /dev/null
+        @@ -1,3 +0,0 @@
+        -export function old() {
+        -  return true
+        -}
+        """
+        let changes = await service.parseChanges(from: diff)
+        #expect(changes.count == 1)
+        #expect(changes[0].status == .deleted)
+        #expect(changes[0].deletions == 3)
+        #expect(changes[0].insertions == 0)
+    }
+
+    @Test
+    func parsesMultipleHunksInSameFile() async {
+        let diff = """
+        diff --git a/src/app.ts b/src/app.ts
+        --- a/src/app.ts
+        +++ b/src/app.ts
+        @@ -1,3 +1,4 @@
+         line1
+        +added1
+         line2
+         line3
+        @@ -10,3 +11,4 @@
+         line10
+        +added2
+         line11
+         line12
+        """
+        let changes = await service.parseChanges(from: diff)
+        #expect(changes.count == 1)
+        #expect(changes[0].insertions == 2)
+        #expect(changes[0].deletions == 0)
+    }
+
+    @Test
+    func parsesFileWithOnlyAdditions() async {
+        let diff = """
+        diff --git a/src/new.ts b/src/new.ts
+        --- a/src/new.ts
+        +++ b/src/new.ts
+        @@ -1,2 +1,5 @@
+         existing
+        +line1
+        +line2
+        +line3
+         end
+        """
+        let changes = await service.parseChanges(from: diff)
+        #expect(changes.count == 1)
+        #expect(changes[0].insertions == 3)
+        #expect(changes[0].deletions == 0)
+        #expect(changes[0].status == .added)
+    }
+
+    @Test
+    func parsesFileWithOnlyDeletions() async {
+        let diff = """
+        diff --git a/src/shrink.ts b/src/shrink.ts
+        --- a/src/shrink.ts
+        +++ b/src/shrink.ts
+        @@ -1,5 +1,2 @@
+         existing
+        -line1
+        -line2
+        -line3
+         end
+        """
+        let changes = await service.parseChanges(from: diff)
+        #expect(changes.count == 1)
+        #expect(changes[0].deletions == 3)
+        #expect(changes[0].insertions == 0)
+        #expect(changes[0].status == .deleted)
+    }
 }
