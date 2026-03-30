@@ -19,91 +19,101 @@ struct SecretAgentManApp: App {
 
     var body: some Scene {
         WindowGroup("Secret Agent Man") {
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                ActivitySidebarView(
-                    mode: $activityMode,
-                    store: store,
-                    branchNames: branchNames,
-                    prInfos: prInfos,
-                    onRemoveAgent: removeAgent,
-                    selectedPlanURL: $selectedPlanURL
-                )
-            } content: {
-                switch activityMode {
-                case .agents:
-                    ChangesView(changes: fileChanges, fullDiff: fullDiff)
-                case .plans:
-                    if let url = selectedPlanURL {
-                        PlanDetailView(url: url)
-                    } else {
-                        ContentUnavailableView(
-                            "No Plan Selected",
-                            systemImage: "doc.text",
-                            description: Text("Select a plan from the sidebar")
-                        )
-                    }
-                }
-            } detail: {
-                PersistentSplitView(
-                    autosaveName: "TerminalSplit",
-                    topMinHeight: 200,
-                    bottomMinHeight: 100,
-                    defaultTopFraction: 0.7
-                ) {
-                    TerminalPanelView(
-                        selectedAgentId: store.selectedAgentId,
+            VStack(spacing: 0) {
+                NavigationSplitView(columnVisibility: $columnVisibility) {
+                    ActivitySidebarView(
+                        mode: $activityMode,
                         store: store,
-                        terminalManager: terminalManager
+                        branchNames: branchNames,
+                        prInfos: prInfos,
+                        onRemoveAgent: removeAgent,
+                        selectedPlanURL: $selectedPlanURL
                     )
-                } bottom: {
-                    VStack(spacing: 0) {
-                        Rectangle()
-                            .fill(Color.accentColor.opacity(0.6))
-                            .frame(height: 3)
-                        ShellPanelView(
+                } content: {
+                    switch activityMode {
+                    case .agents:
+                        ChangesView(changes: fileChanges, fullDiff: fullDiff)
+                    case .plans:
+                        if let url = selectedPlanURL {
+                            PlanDetailView(url: url)
+                        } else {
+                            ContentUnavailableView(
+                                "No Plan Selected",
+                                systemImage: "doc.text",
+                                description: Text("Select a plan from the sidebar")
+                            )
+                        }
+                    }
+                } detail: {
+                    PersistentSplitView(
+                        autosaveName: "TerminalSplit",
+                        topMinHeight: 200,
+                        bottomMinHeight: 100,
+                        defaultTopFraction: 0.7
+                    ) {
+                        TerminalPanelView(
                             selectedAgentId: store.selectedAgentId,
                             store: store,
-                            shellManager: shellManager
+                            terminalManager: terminalManager
                         )
-                    }
-                }
-            }
-            .navigationSplitViewStyle(.balanced)
-            .frame(minWidth: 900, minHeight: 600)
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    VersionBadgeView()
-                }
-            }
-            .onChange(of: store.selectedAgentId) {
-                refreshDiffs()
-                if let id = store.selectedAgentId {
-                    UserDefaults.standard.set(id.uuidString, forKey: "selectedAgentId")
-                }
-            }
-            .onAppear {
-                startDiffPolling()
-                startPRPolling()
-                terminalManager.startMonitoring { id, state in
-                    store.updateState(id: id, state: state)
-                }
-                terminalManager.onLaunched = { id in
-                    store.markLaunched(id: id)
-                }
-                terminalManager.onSessionNotFound = { id in
-                    store.resetSession(id: id)
-                    if let agent = store.agents.first(where: { $0.id == id }) {
-                        terminalManager.restartAgent(agent) { id, state in
-                            store.updateState(id: id, state: state)
+                    } bottom: {
+                        VStack(spacing: 0) {
+                            Rectangle()
+                                .fill(Color.accentColor.opacity(0.6))
+                                .frame(height: 3)
+                            ShellPanelView(
+                                selectedAgentId: store.selectedAgentId,
+                                store: store,
+                                shellManager: shellManager
+                            )
                         }
                     }
                 }
-            }
-            .onDisappear {
-                diffTimer?.invalidate()
-                prTimer?.invalidate()
-                terminalManager.stopMonitoring()
-            }
+                .navigationSplitViewStyle(.balanced)
+                .frame(minWidth: 900, minHeight: 600)
+                .toolbar {
+                    ToolbarItem(placement: .automatic) {
+                        VersionBadgeView()
+                    }
+                }
+                .onChange(of: store.selectedAgentId) {
+                    refreshDiffs()
+                    if let id = store.selectedAgentId {
+                        UserDefaults.standard.set(id.uuidString, forKey: "selectedAgentId")
+                    }
+                }
+                .onAppear {
+                    startDiffPolling()
+                    startPRPolling()
+                    terminalManager.startMonitoring { id, state in
+                        store.updateState(id: id, state: state)
+                    }
+                    terminalManager.onLaunched = { id in
+                        store.markLaunched(id: id)
+                    }
+                    terminalManager.onSessionNotFound = { id in
+                        store.resetSession(id: id)
+                        if let agent = store.agents.first(where: { $0.id == id }) {
+                            terminalManager.restartAgent(agent) { id, state in
+                                store.updateState(id: id, state: state)
+                            }
+                        }
+                    }
+                }
+                .onDisappear {
+                    diffTimer?.invalidate()
+                    prTimer?.invalidate()
+                    terminalManager.stopMonitoring()
+                }
+
+                Divider()
+
+                StatusBarView(
+                    mode: $activityMode,
+                    store: store,
+                    branchNames: branchNames
+                )
+            } // VStack
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)

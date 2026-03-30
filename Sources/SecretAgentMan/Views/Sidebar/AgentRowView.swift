@@ -8,18 +8,9 @@ struct AgentRowView: View {
         HStack(spacing: 8) {
             StatusBadge(state: agent.state)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(agent.name)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .lineLimit(1)
-
-                if let sessionId = agent.sessionId {
-                    Text(sessionId)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
+            Text(agent.name)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .lineLimit(1)
 
             Spacer()
         }
