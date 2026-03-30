@@ -103,10 +103,8 @@ final class TerminalManager {
                 } else {
                     .awaitingInput
                 }
-            } else if currentState == .awaitingInput {
-                // Only leave green if user actually pressed Enter
-                userSubmittedSinceIdle ? .active : .awaitingInput
             } else {
+                // Terminal is producing output — Claude is working
                 .active
             }
 
