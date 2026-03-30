@@ -8,10 +8,13 @@ A macOS app for managing multiple Claude Code agent sessions with a Slack-like i
 - **Embedded terminal** — full interactive Claude Code TUI via SwiftTerm
 - **Split shell** — a second terminal below Claude for running git/jj commands in the agent's directory
 - **Colored diff view** — unified and side-by-side diff views with per-file filtering
+- **PR status tracking** — live CI check status, additions/deletions, reviewer avatars, and PR state per folder via `gh` CLI
 - **Ghostty theme support** — 460+ terminal themes bundled with the app (no Ghostty installation required)
 - **Plans panel** — browse and read Claude Code plans with full markdown rendering
 - **VCS integration** — shows jj commit descriptions or git branch names per folder
-- **Session persistence** — agents and sessions survive app restarts via `claude --resume`
+- **Session persistence** — agents and sessions survive app restarts via `claude --resume`, with automatic recovery from stale sessions
+- **Auto mode** — all Claude sessions launch with `--enable-auto-mode`
+- **Collapsible folders** — sidebar folder sections collapse to hide agents, with open/closed folder icons
 - **Keyboard shortcuts** — Cmd+1-9 to switch agents, Cmd+N for new agent
 - **Plugin support** — configurable `--plugin-dir` passed to all Claude sessions
 
@@ -19,6 +22,7 @@ A macOS app for managing multiple Claude Code agent sessions with a Slack-like i
 
 - macOS 14.0+
 - [Claude Code](https://claude.ai/download) CLI installed
+- [`gh` CLI](https://cli.github.com) (optional, for PR status tracking)
 
 ## Setup
 
@@ -58,15 +62,21 @@ xattr -cr /Applications/SecretAgentMan.app
 ```
 Sources/SecretAgentMan/
   SecretAgentManApp.swift          — App entry point
-  Models/                          — Agent, AgentState, FileChange
-  Services/                        — Process management, diff, themes, shell
+  Models/                          — Agent, AgentState, FileChange, PRCheckStatus
+  Services/                        — Process management, diff, themes, PR status, shell
   ViewModels/                      — AgentStore (observable state)
   Views/
     Sidebar/                       — Activity bar, agent list, plan list
     Center/                        — Diff views, plan detail, changes
     Terminal/                      — Claude terminal, shell terminal
-    Common/                        — Status badge
+    Common/                        — Persistent split view, status badge
 ```
+
+## Data Storage
+
+- **Agent config** — `~/Library/Application Support/SecretAgentMan/agents.json`
+- **Settings** — UserDefaults (theme, plugin directory, selected agent, split positions)
+- **Sessions** — Claude Code sessions stored by Claude in `~/.claude/projects/`
 
 ## License
 
