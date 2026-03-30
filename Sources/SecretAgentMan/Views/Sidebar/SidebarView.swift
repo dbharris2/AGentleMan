@@ -27,19 +27,25 @@ struct SidebarView: View {
                             }
                     }
                 } header: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(group.folder)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.primary)
-                            .textCase(nil)
-                            .lineLimit(1)
-                        if let branch = branchNames[group.folder] {
-                            Text(branch)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 2)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(group.folder)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.primary)
                                 .textCase(nil)
                                 .lineLimit(1)
-                                .truncationMode(.tail)
+                            if let branch = branchNames[group.folder] {
+                                Text(branch)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .textCase(nil)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
                         }
                     }
                 }
