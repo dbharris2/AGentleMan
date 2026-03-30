@@ -9,6 +9,7 @@ final class TerminalManager {
     private var statusTimer: Timer?
     private var onStateChange: ((UUID, AgentState) -> Void)?
     var onLaunched: ((UUID) -> Void)?
+    var onSessionNotFound: ((UUID) -> Void)?
     private var lastStates: [UUID: AgentState] = [:]
 
     /// Seconds of no output before considering agent idle (ready for input).
@@ -49,6 +50,10 @@ final class TerminalManager {
         applyTheme(to: terminal)
 
         let delegate = TerminalDelegate(agentId: agent.id, onStateChange: onStateChange)
+        delegate.terminal = terminal
+        delegate.onSessionNotFound = { [weak self] id in
+            self?.onSessionNotFound?(id)
+        }
         terminal.processDelegate = delegate
 
         terminals[agent.id] = terminal
@@ -67,6 +72,18 @@ final class TerminalManager {
         onLaunched?(agent.id)
 
         return terminal
+    }
+
+    func restartAgent(
+        _ agent: Agent,
+        onStateChange: @escaping (UUID, AgentState) -> Void
+    ) {
+        // Remove stale terminal
+        terminals.removeValue(forKey: agent.id)
+        delegates.removeValue(forKey: agent.id)
+        lastStates.removeValue(forKey: agent.id)
+        // Re-create with fresh session
+        _ = terminal(for: agent, onStateChange: onStateChange)
     }
 
     func removeTerminal(for agentId: UUID) {
@@ -152,6 +169,8 @@ final class TerminalManager {
 final class TerminalDelegate: NSObject, LocalProcessTerminalViewDelegate, @unchecked Sendable {
     let agentId: UUID
     let onStateChange: (UUID, AgentState) -> Void
+    var onSessionNotFound: ((UUID) -> Void)?
+    weak var terminal: MonitoredTerminalView?
 
     init(agentId: UUID, onStateChange: @escaping (UUID, AgentState) -> Void) {
         self.agentId = agentId
@@ -165,7 +184,11 @@ final class TerminalDelegate: NSObject, LocalProcessTerminalViewDelegate, @unche
     func processTerminated(source: TerminalView, exitCode: Int32?) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.onStateChange(self.agentId, .finished)
+            if self.terminal?.detectedSessionNotFound == true {
+                self.onSessionNotFound?(self.agentId)
+            } else {
+                self.onStateChange(self.agentId, .finished)
+            }
         }
     }
 }

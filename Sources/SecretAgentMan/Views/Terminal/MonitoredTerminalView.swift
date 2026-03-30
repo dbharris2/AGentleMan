@@ -5,6 +5,7 @@ class MonitoredTerminalView: LocalProcessTerminalView {
     /// Tracks "meaningful" data — bursts larger than cursor blink escape sequences.
     var lastMeaningfulData = Date()
     var userSubmittedAt: Date?
+    var detectedSessionNotFound = false
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
         super.dataReceived(slice: slice)
@@ -12,6 +13,11 @@ class MonitoredTerminalView: LocalProcessTerminalView {
         // Real output (text, tool calls, progress) is larger.
         if slice.count > 20 {
             lastMeaningfulData = Date()
+        }
+        if !detectedSessionNotFound,
+           let text = String(bytes: slice, encoding: .utf8),
+           text.contains("No conversation found with session ID") {
+            detectedSessionNotFound = true
         }
     }
 

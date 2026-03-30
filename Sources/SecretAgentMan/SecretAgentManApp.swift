@@ -44,26 +44,27 @@ struct SecretAgentManApp: App {
                     }
                 }
             } detail: {
-                GeometryReader { geo in
-                    VSplitView {
-                        TerminalPanelView(
+                PersistentSplitView(
+                    autosaveName: "TerminalSplit",
+                    topMinHeight: 200,
+                    bottomMinHeight: 100,
+                    defaultTopFraction: 0.7
+                ) {
+                    TerminalPanelView(
+                        selectedAgentId: store.selectedAgentId,
+                        store: store,
+                        terminalManager: terminalManager
+                    )
+                } bottom: {
+                    VStack(spacing: 0) {
+                        Rectangle()
+                            .fill(Color.accentColor.opacity(0.6))
+                            .frame(height: 3)
+                        ShellPanelView(
                             selectedAgentId: store.selectedAgentId,
                             store: store,
-                            terminalManager: terminalManager
+                            shellManager: shellManager
                         )
-                        .frame(minHeight: 200, idealHeight: geo.size.height * 0.7)
-
-                        VStack(spacing: 0) {
-                            Rectangle()
-                                .fill(Color.accentColor.opacity(0.6))
-                                .frame(height: 3)
-                            ShellPanelView(
-                                selectedAgentId: store.selectedAgentId,
-                                store: store,
-                                shellManager: shellManager
-                            )
-                        }
-                        .frame(minHeight: 100, idealHeight: geo.size.height * 0.3)
                     }
                 }
             }
@@ -83,6 +84,14 @@ struct SecretAgentManApp: App {
                 }
                 terminalManager.onLaunched = { id in
                     store.markLaunched(id: id)
+                }
+                terminalManager.onSessionNotFound = { id in
+                    store.resetSession(id: id)
+                    if let agent = store.agents.first(where: { $0.id == id }) {
+                        terminalManager.restartAgent(agent) { id, state in
+                            store.updateState(id: id, state: state)
+                        }
+                    }
                 }
             }
             .onDisappear {

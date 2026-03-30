@@ -14,7 +14,12 @@ struct ChangesView: View {
 
     var body: some View {
         ZStack {
-            VSplitView {
+            PersistentSplitView(
+                autosaveName: "ChangesSplit",
+                topMinHeight: 80,
+                bottomMinHeight: 200,
+                defaultTopFraction: 0.25
+            ) {
                 VStack(spacing: 0) {
                     fileList
 
@@ -30,8 +35,7 @@ struct ChangesView: View {
                         .padding(.vertical, 4)
                     }
                 }
-                .frame(minHeight: 80, idealHeight: 140)
-
+            } bottom: {
                 VStack(spacing: 0) {
                     Rectangle()
                         .fill(Color.accentColor.opacity(0.6))
@@ -44,7 +48,6 @@ struct ChangesView: View {
                         }
                     }
                 }
-                .frame(minHeight: 200)
             }
             .opacity(changes.isEmpty ? 0 : 1)
 

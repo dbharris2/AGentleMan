@@ -22,19 +22,28 @@ struct TerminalContainerView: NSViewRepresentable {
         let newId = selectedAgentId
         let oldId = context.coordinator.currentAgentId
 
-        guard newId != oldId else { return }
-
-        for subview in container.subviews {
-            subview.removeFromSuperview()
-        }
-
-        context.coordinator.currentAgentId = newId
-
         guard let agentId = newId, let agent = store.agents.first(where: { $0.id == agentId }) else {
+            if newId != oldId {
+                for subview in container.subviews {
+                    subview.removeFromSuperview()
+                }
+                context.coordinator.currentAgentId = newId
+                context.coordinator.currentTerminal = nil
+            }
             return
         }
 
         let terminal = terminalProvider(agent)
+
+        // Re-embed if agent changed or terminal instance changed (e.g. session restart)
+        guard newId != oldId || terminal !== context.coordinator.currentTerminal else { return }
+
+        for subview in container.subviews {
+            subview.removeFromSuperview()
+        }
+        context.coordinator.currentAgentId = newId
+        context.coordinator.currentTerminal = terminal
+
         Self.embed(terminal, in: container)
 
         DispatchQueue.main.async {
@@ -60,5 +69,6 @@ struct TerminalContainerView: NSViewRepresentable {
 
     final class Coordinator {
         var currentAgentId: UUID?
+        weak var currentTerminal: LocalProcessTerminalView?
     }
 }
