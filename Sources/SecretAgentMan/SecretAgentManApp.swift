@@ -49,11 +49,16 @@ struct SecretAgentManApp: App {
                         )
                         .frame(minHeight: 200, idealHeight: geo.size.height * 0.7)
 
-                        ShellPanelView(
-                            selectedAgentId: store.selectedAgentId,
-                            store: store,
-                            shellManager: shellManager
-                        )
+                        VStack(spacing: 0) {
+                            Rectangle()
+                                .fill(Color.accentColor.opacity(0.6))
+                                .frame(height: 3)
+                            ShellPanelView(
+                                selectedAgentId: store.selectedAgentId,
+                                store: store,
+                                shellManager: shellManager
+                            )
+                        }
                         .frame(minHeight: 100, idealHeight: geo.size.height * 0.3)
                     }
                 }

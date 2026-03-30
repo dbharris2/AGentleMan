@@ -32,11 +32,16 @@ struct ChangesView: View {
                 }
                 .frame(minHeight: 80, idealHeight: 140)
 
-                Group {
-                    if diffMode == "sideBySide" {
-                        SideBySideDiffView(diffText: visibleDiff)
-                    } else {
-                        DiffView(diffText: visibleDiff)
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(Color.accentColor.opacity(0.6))
+                        .frame(height: 3)
+                    Group {
+                        if diffMode == "sideBySide" {
+                            SideBySideDiffView(diffText: visibleDiff)
+                        } else {
+                            DiffView(diffText: visibleDiff)
+                        }
                     }
                 }
                 .frame(minHeight: 200)
