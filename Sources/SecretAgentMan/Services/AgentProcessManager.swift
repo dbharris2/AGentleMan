@@ -25,7 +25,7 @@ final class AgentProcessManager {
         sessionId: String? = nil,
         hasLaunched: Bool = false
     ) {
-        var args: [String] = []
+        var args = ["--enable-auto-mode"]
 
         if let sessionId {
             if hasLaunched {
