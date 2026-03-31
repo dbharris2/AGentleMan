@@ -6,6 +6,7 @@ struct SettingsView: View {
 
     @AppStorage(UserDefaultsKeys.terminalTheme) private var selectedTheme = "Catppuccin Mocha"
     @AppStorage(UserDefaultsKeys.pluginDirectory) private var pluginDirectory = ""
+    @AppStorage(UserDefaultsKeys.defaultAgentFolder) private var defaultAgentFolder = ""
     @State private var searchText = ""
     @State private var allThemes: [String] = []
     @State private var listSelection: String?
@@ -17,6 +18,31 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Section {
+                Text("Default Agent Folder")
+                    .font(.headline)
+
+                HStack {
+                    TextField("Default folder path", text: $defaultAgentFolder)
+                        .textFieldStyle(.roundedBorder)
+
+                    Button("Browse...") {
+                        let panel = NSOpenPanel()
+                        panel.canChooseDirectories = true
+                        panel.canChooseFiles = false
+                        if panel.runModal() == .OK, let url = panel.url {
+                            defaultAgentFolder = url.path
+                        }
+                    }
+                }
+
+                Text("Pre-filled when creating new agents")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
             Section {
                 Text("Claude Plugins")
                     .font(.headline)

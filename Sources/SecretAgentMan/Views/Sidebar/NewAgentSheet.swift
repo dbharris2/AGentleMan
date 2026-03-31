@@ -4,6 +4,7 @@ struct NewAgentSheet: View {
     let store: AgentStore
     @Binding var isPresented: Bool
 
+    @AppStorage(UserDefaultsKeys.defaultAgentFolder) private var defaultAgentFolder = ""
     @State private var name = ""
     @State private var selectedFolder: URL?
     @State private var initialPrompt = ""
@@ -49,6 +50,18 @@ struct NewAgentSheet: View {
         }
         .padding(20)
         .frame(width: 400)
+        .onAppear {
+            if !defaultAgentFolder.isEmpty {
+                let url = URL(fileURLWithPath: defaultAgentFolder)
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                    selectedFolder = url
+                    if name.isEmpty {
+                        name = url.lastPathComponent
+                    }
+                }
+            }
+        }
     }
 
     private func chooseFolder() {
