@@ -6,14 +6,10 @@ final class TerminalManager {
     private var terminals: [UUID: MonitoredTerminalView] = [:]
     private var delegates: [UUID: TerminalDelegate] = [:]
     private var processManager = AgentProcessManager()
-    private var statusTimer: Timer?
-    private var onStateChange: ((UUID, AgentState) -> Void)?
+    var onStateChange: ((UUID, AgentState) -> Void)?
     var onLaunched: ((UUID) -> Void)?
     var onSessionNotFound: ((UUID) -> Void)?
     private var lastStates: [UUID: AgentState] = [:]
-
-    /// Seconds of no output before considering agent idle (ready for input).
-    private let idleThreshold: TimeInterval = 5.0
 
     var themeName: String = UserDefaults.standard.string(forKey: UserDefaultsKeys.terminalTheme) ?? "Catppuccin Mocha" {
         didSet { applyThemeToAll() }
@@ -21,20 +17,6 @@ final class TerminalManager {
 
     private var currentTheme: GhosttyTheme? {
         GhosttyThemeLoader.load(named: themeName)
-    }
-
-    func startMonitoring(onStateChange: @escaping (UUID, AgentState) -> Void) {
-        self.onStateChange = onStateChange
-        statusTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.pollStatus()
-            }
-        }
-    }
-
-    func stopMonitoring() {
-        statusTimer?.invalidate()
-        statusTimer = nil
     }
 
     func terminal(
@@ -59,6 +41,21 @@ final class TerminalManager {
         terminals[agent.id] = terminal
         delegates[agent.id] = delegate
 
+        // Wire up event-driven state callbacks
+        let agentId = agent.id
+        terminal.onActivity = { [weak self] in
+            guard let self else { return }
+            if self.lastStates[agentId] != .active {
+                self.lastStates[agentId] = .active
+                self.onStateChange?(agentId, .active)
+            }
+        }
+        terminal.onIdleTimeout = { [weak self] in
+            guard let self else { return }
+            self.lastStates[agentId] = .awaitingInput
+            self.onStateChange?(agentId, .awaitingInput)
+        }
+
         processManager.startAgent(
             terminal: terminal,
             folder: agent.folder,
@@ -69,7 +66,10 @@ final class TerminalManager {
 
         lastStates[agent.id] = .active
         onStateChange(agent.id, .active)
+        self.onStateChange?(agent.id, .active)
         onLaunched?(agent.id)
+
+        terminal.startIdleTimer()
 
         return terminal
     }
@@ -97,39 +97,6 @@ final class TerminalManager {
 
     func hasTerminal(for agentId: UUID) -> Bool {
         terminals[agentId] != nil
-    }
-
-    private func pollStatus() {
-        for (agentId, terminal) in terminals {
-            guard terminal.process?.running == true else { continue }
-
-            let idle = terminal.secondsSinceMeaningfulData > idleThreshold
-            let currentState = lastStates[agentId] ?? .idle
-
-            // Only go active if user submitted input since we last went idle
-            let userSubmittedSinceIdle = if let submitted = terminal.userSubmittedAt {
-                !idle && submitted.timeIntervalSinceNow > -terminal.secondsSinceMeaningfulData
-            } else {
-                false
-            }
-
-            let newState: AgentState = if idle {
-                if currentState == .idle, terminal.secondsSinceMeaningfulData < 15 {
-                    // Startup phase — still loading
-                    .active
-                } else {
-                    .awaitingInput
-                }
-            } else {
-                // Terminal is producing output — Claude is working
-                .active
-            }
-
-            if lastStates[agentId] != newState {
-                lastStates[agentId] = newState
-                onStateChange?(agentId, newState)
-            }
-        }
     }
 
     private func applyTheme(to terminal: MonitoredTerminalView) {

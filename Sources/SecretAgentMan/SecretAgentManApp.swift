@@ -8,7 +8,7 @@ struct SecretAgentManApp: App {
     @State private var diffService = DiffService()
     @State private var fileChanges: [FileChange] = []
     @State private var fullDiff: String = ""
-    @State private var diffTimer: Timer?
+    @State private var fileWatcher = FileSystemWatcher()
     @State private var prTimer: Timer?
     @State private var branchNames: [String: String] = [:]
     @State private var prInfos: [String: PRInfo] = [:]
@@ -122,9 +122,9 @@ struct SecretAgentManApp: App {
                     }
                 }
                 .onAppear {
-                    startDiffPolling()
+                    setupFileWatcher()
                     startPRPolling()
-                    terminalManager.startMonitoring { id, state in
+                    terminalManager.onStateChange = { id, state in
                         store.updateState(id: id, state: state)
                     }
                     terminalManager.onLaunched = { id in
@@ -138,11 +138,23 @@ struct SecretAgentManApp: App {
                             }
                         }
                     }
+                    // Initial data load
+                    refreshDiffs()
+                    refreshBranchNames()
                 }
                 .onDisappear {
-                    diffTimer?.invalidate()
+                    fileWatcher.unwatchAll()
                     prTimer?.invalidate()
-                    terminalManager.stopMonitoring()
+                }
+                .onChange(of: store.agents.map(\.folder)) { oldFolders, newFolders in
+                    let oldSet = Set(oldFolders)
+                    let newSet = Set(newFolders)
+                    for removed in oldSet.subtracting(newSet) {
+                        fileWatcher.unwatch(directory: removed)
+                    }
+                    for added in newSet.subtracting(oldSet) {
+                        fileWatcher.watch(directory: added)
+                    }
                 }
 
                 Divider()
@@ -192,12 +204,19 @@ struct SecretAgentManApp: App {
         folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 
-    private func startDiffPolling() {
-        diffTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
-            Task { @MainActor in
+    private func setupFileWatcher() {
+        fileWatcher.onDirectoryChanged = { changedFolder in
+            refreshBranchName(for: changedFolder)
+            if let selected = store.selectedAgent,
+               selected.folder.standardizedFileURL == changedFolder {
                 refreshDiffs()
-                refreshBranchNames()
             }
+        }
+        fileWatcher.onVCSMetadataChanged = { changedFolder in
+            refreshBranchName(for: changedFolder)
+        }
+        for folder in Set(store.agents.map(\.folder)) {
+            fileWatcher.watch(directory: folder)
         }
     }
 
@@ -231,20 +250,19 @@ struct SecretAgentManApp: App {
 
     private func refreshBranchNames() {
         let folders = Set(store.agents.map(\.folder))
-        var anyChanged = false
         for folder in folders {
-            Task {
-                let name = await diffService.fetchBranchName(in: folder)
-                let key = Self.folderKey(folder)
-                await MainActor.run {
-                    if branchNames[key] != name {
-                        branchNames[key] = name
-                        if !anyChanged {
-                            anyChanged = true
-                            // Defer PR refresh until next run loop tick to batch changes
-                            DispatchQueue.main.async { refreshPRStatuses() }
-                        }
-                    }
+            refreshBranchName(for: folder)
+        }
+    }
+
+    private func refreshBranchName(for folder: URL) {
+        Task {
+            let name = await diffService.fetchBranchName(in: folder)
+            let key = Self.folderKey(folder)
+            await MainActor.run {
+                if branchNames[key] != name {
+                    branchNames[key] = name
+                    DispatchQueue.main.async { refreshPRStatuses() }
                 }
             }
         }
