@@ -18,6 +18,8 @@ class MonitoredTerminalView: LocalProcessTerminalView {
     private let startupGracePeriod: TimeInterval = 15.0
     private var hasReceivedFirstMeaningfulData = false
 
+    private var isIdle = true
+
     override func dataReceived(slice: ArraySlice<UInt8>) {
         super.dataReceived(slice: slice)
         // Cursor blink/position updates are typically < 20 bytes.
@@ -25,8 +27,10 @@ class MonitoredTerminalView: LocalProcessTerminalView {
         if slice.count > 20 {
             lastMeaningfulData = Date()
             hasReceivedFirstMeaningfulData = true
-            onActivity?()
-            resetIdleTimer()
+            if isIdle {
+                isIdle = false
+                onActivity?()
+            }
         }
         if !detectedSessionNotFound,
            let text = String(bytes: slice, encoding: .utf8),
@@ -43,14 +47,10 @@ class MonitoredTerminalView: LocalProcessTerminalView {
         }
     }
 
-    /// Start the initial idle countdown. Call after terminal setup.
+    /// Start a repeating timer that checks for idle state.
     func startIdleTimer() {
-        resetIdleTimer()
-    }
-
-    private func resetIdleTimer() {
         idleTimer?.invalidate()
-        idleTimer = Timer.scheduledTimer(withTimeInterval: idleThreshold, repeats: false) {
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) {
             [weak self] _ in
             guard let self else { return }
             // During startup grace, don't transition to idle if no output yet
@@ -58,7 +58,10 @@ class MonitoredTerminalView: LocalProcessTerminalView {
                Date().timeIntervalSince(self.startTime) < self.startupGracePeriod {
                 return
             }
-            self.onIdleTimeout?()
+            if self.secondsSinceMeaningfulData > self.idleThreshold, !self.isIdle {
+                self.isIdle = true
+                self.onIdleTimeout?()
+            }
         }
     }
 
