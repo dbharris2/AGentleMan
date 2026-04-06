@@ -6,53 +6,35 @@ enum SidebarPanel: String {
 }
 
 struct ActivitySidebarView: View {
-    @Binding var activePanel: SidebarPanel?
-    @Bindable var store: AgentStore
-    var branchNames: [String: String]
-    var prInfos: [String: PRInfo]
-    var onRemoveAgent: (UUID) -> Void
+    @Environment(AppCoordinator.self) private var coordinator
     @Binding var selectedPlanURL: URL?
-    var prSections: [GitHubPRService.PRSection: [GitHubPRService.GitHubPR]]
-    var onReviewPR: (GitHubPRService.GitHubPR) -> Void
-    var onSelectPR: (GitHubPRService.GitHubPR?) -> Void
-    var selectedPRId: String?
     @AppStorage("sidebarSplitHeight") private var bottomPanelHeight: Double = 250
 
     var body: some View {
-        if let panel = activePanel {
+        @Bindable var coordinator = coordinator
+        if let panel = coordinator.activeSidebarPanel {
             VStack(spacing: 0) {
-                SidebarView(
-                    store: store,
-                    branchNames: branchNames,
-                    prInfos: prInfos,
-                    onRemoveAgent: onRemoveAgent
-                )
+                SidebarView(selectedPlanURL: $selectedPlanURL)
 
                 ResizableDivider(size: $bottomPanelHeight, minSize: 100, axis: .horizontal)
 
-                // Bottom panel
                 Group {
                     switch panel {
                     case .plans:
                         PlanListView(selectedPlanURL: $selectedPlanURL)
                     case .prs:
                         PRListView(
-                            sections: prSections,
-                            onReview: onReviewPR,
-                            onSelect: onSelectPR,
-                            selectedPRId: selectedPRId
+                            sections: coordinator.githubPRSections,
+                            onReview: coordinator.reviewPR,
+                            onSelect: coordinator.selectPR,
+                            selectedPRId: coordinator.selectedGitHubPR?.id
                         )
                     }
                 }
                 .frame(height: bottomPanelHeight)
             }
         } else {
-            SidebarView(
-                store: store,
-                branchNames: branchNames,
-                prInfos: prInfos,
-                onRemoveAgent: onRemoveAgent
-            )
+            SidebarView(selectedPlanURL: $selectedPlanURL)
         }
     }
 }

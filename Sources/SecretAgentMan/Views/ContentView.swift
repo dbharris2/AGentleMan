@@ -3,34 +3,21 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppCoordinator.self) private var coordinator
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var activeSidebarPanel: SidebarPanel?
     @State private var selectedPlanURL: URL?
     @AppStorage("shellPanelVisible") private var isShellPanelVisible = false
     @AppStorage("shellPanelHeight") private var shellPanelHeight: Double = 200
-    @State private var isAgentPanelVisible = true
     @AppStorage("agentPanelWidth") private var agentPanelWidth: Double = 500
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 NavigationSplitView(columnVisibility: $columnVisibility) {
-                    ActivitySidebarView(
-                        activePanel: $activeSidebarPanel,
-                        store: coordinator.store,
-                        branchNames: coordinator.branchNames,
-                        prInfos: coordinator.prInfos,
-                        onRemoveAgent: coordinator.removeAgent,
-                        selectedPlanURL: $selectedPlanURL,
-                        prSections: coordinator.githubPRSections,
-                        onReviewPR: coordinator.reviewPR,
-                        onSelectPR: coordinator.selectPR,
-                        selectedPRId: coordinator.selectedGitHubPR?.id
-                    )
+                    ActivitySidebarView(selectedPlanURL: $selectedPlanURL)
                 } detail: {
                     ZStack(alignment: .bottom) {
-                        if activeSidebarPanel == .plans, let url = selectedPlanURL {
+                        if coordinator.activeSidebarPanel == .plans, let url = selectedPlanURL {
                             PlanDetailView(url: url)
-                        } else if activeSidebarPanel == .prs, let pr = coordinator.selectedGitHubPR {
+                        } else if coordinator.activeSidebarPanel == .prs, let pr = coordinator.selectedGitHubPR {
                             if coordinator.selectedPRChanges.isEmpty, !coordinator.selectedPRDiff.isEmpty {
                                 ChangesView(changes: coordinator.selectedPRChanges, fullDiff: coordinator.selectedPRDiff)
                             } else if coordinator.selectedPRChanges.isEmpty {
@@ -61,7 +48,7 @@ struct ContentView: View {
                     }
                 }
 
-                if isAgentPanelVisible {
+                if coordinator.isAgentPanelVisible {
                     ResizableDivider(size: $agentPanelWidth, minSize: 300, axis: .vertical)
 
                     TerminalPanelView(
@@ -104,14 +91,7 @@ struct ContentView: View {
 
             Divider()
 
-            StatusBarView(
-                activePanel: $activeSidebarPanel,
-                store: coordinator.store,
-                branchNames: coordinator.branchNames,
-                isShellPanelVisible: $isShellPanelVisible,
-                isAgentPanelVisible: $isAgentPanelVisible,
-                shellManager: coordinator.shellManager
-            )
+            StatusBarView()
         }
     }
 }

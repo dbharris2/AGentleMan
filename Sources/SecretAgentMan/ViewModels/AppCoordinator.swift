@@ -23,6 +23,11 @@ final class AppCoordinator {
     var selectedPRDiff: String = ""
     var selectedPRChanges: [FileChange] = []
 
+    // MARK: - UI State
+
+    var activeSidebarPanel: SidebarPanel?
+    var isAgentPanelVisible = true
+
     // MARK: - Private
 
     private var fileWatcher = FileSystemWatcher()
