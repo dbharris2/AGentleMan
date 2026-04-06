@@ -517,19 +517,19 @@ struct SecretAgentManApp: App {
     }
 
     private func reviewPR(_ pr: GitHubPRService.GitHubPR) {
-        // Find an existing agent for this repo, or use the selected agent
-        let repoFolder = store.agents.first { agent in
-            agent.folderPath.contains(pr.repository.components(separatedBy: "/").last ?? "")
-        }
+        // Find an existing agent's folder for this repo
+        let repoName = pr.repository.components(separatedBy: "/").last ?? ""
+        let matchingAgent = store.agents.first { $0.folderPath.contains(repoName) }
 
-        let targetAgent: Agent
-        if let existing = repoFolder {
-            targetAgent = existing
-        } else if let selected = store.selectedAgent {
-            targetAgent = selected
-        } else {
-            return
-        }
+        guard let folder = matchingAgent?.folder else { return }
+
+        // Create a dedicated review agent, preserving current selection
+        let previousSelection = store.selectedAgentId
+        let reviewAgent = store.addAgent(
+            name: "PR #\(pr.number) - Review",
+            folder: folder
+        )
+        store.selectedAgentId = previousSelection
 
         let prompt = """
         Review PR #\(pr.number) at \(pr.url.absoluteString)
@@ -548,13 +548,13 @@ struct SecretAgentManApp: App {
         """
 
         store.addPendingPrompt(PendingPrompt(
-            agentId: targetAgent.id,
+            agentId: reviewAgent.id,
             source: .reviewPR,
             summary: "Diff review: \(pr.repository) #\(pr.number)",
             fullPrompt: prompt
         ))
 
-        // Switch to the target agent so the pending prompt appears
-        store.selectedAgentId = targetAgent.id
+        // Don't switch selectedAgentId — keep the PR diff in the center view.
+        // The pending prompt will appear when the user selects the review agent.
     }
 }
