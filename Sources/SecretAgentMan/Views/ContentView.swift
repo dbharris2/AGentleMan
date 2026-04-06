@@ -49,23 +49,7 @@ struct ContentView: View {
 
                         if isShellPanelVisible {
                             VStack(spacing: 0) {
-                                Rectangle()
-                                    .fill(Color.accentColor.opacity(0.6))
-                                    .frame(height: 3)
-                                    .contentShape(Rectangle().size(width: 1000, height: 12))
-                                    .gesture(
-                                        DragGesture()
-                                            .onChanged { value in
-                                                shellPanelHeight = max(100, shellPanelHeight - value.translation.height)
-                                            }
-                                    )
-                                    .onHover { hovering in
-                                        if hovering {
-                                            NSCursor.resizeUpDown.push()
-                                        } else {
-                                            NSCursor.pop()
-                                        }
-                                    }
+                                ResizableDivider(size: $shellPanelHeight, minSize: 100, axis: .horizontal)
                                 ShellPanelView(
                                     selectedAgentId: coordinator.store.selectedAgentId,
                                     store: coordinator.store,
@@ -78,23 +62,7 @@ struct ContentView: View {
                 }
 
                 if isAgentPanelVisible {
-                    Rectangle()
-                        .fill(Color.accentColor.opacity(0.6))
-                        .frame(width: 3)
-                        .contentShape(Rectangle().size(width: 12, height: 1000))
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    agentPanelWidth = max(300, agentPanelWidth - value.translation.width)
-                                }
-                        )
-                        .onHover { hovering in
-                            if hovering {
-                                NSCursor.resizeLeftRight.push()
-                            } else {
-                                NSCursor.pop()
-                            }
-                        }
+                    ResizableDivider(size: $agentPanelWidth, minSize: 300, axis: .vertical)
 
                     TerminalPanelView(
                         selectedAgentId: coordinator.store.selectedAgentId,

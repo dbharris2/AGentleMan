@@ -28,24 +28,7 @@ struct ActivitySidebarView: View {
                     onRemoveAgent: onRemoveAgent
                 )
 
-                // Resizable divider
-                Rectangle()
-                    .fill(Color.accentColor.opacity(0.6))
-                    .frame(height: 3)
-                    .contentShape(Rectangle().size(width: 1000, height: 12))
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                bottomPanelHeight = max(100, bottomPanelHeight - value.translation.height)
-                            }
-                    )
-                    .onHover { hovering in
-                        if hovering {
-                            NSCursor.resizeUpDown.push()
-                        } else {
-                            NSCursor.pop()
-                        }
-                    }
+                ResizableDivider(size: $bottomPanelHeight, minSize: 100, axis: .horizontal)
 
                 // Bottom panel
                 Group {
