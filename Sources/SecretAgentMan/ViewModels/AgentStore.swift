@@ -64,6 +64,13 @@ final class AgentStore {
         save()
     }
 
+    func updateSessionId(id: UUID, sessionId: String) {
+        guard let index = agents.firstIndex(where: { $0.id == id }) else { return }
+        guard agents[index].sessionId != sessionId else { return }
+        agents[index].sessionId = sessionId
+        save()
+    }
+
     func updateState(id: UUID, state: AgentState) {
         guard let index = agents.firstIndex(where: { $0.id == id }) else { return }
         agents[index].state = state
