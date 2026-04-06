@@ -22,7 +22,7 @@ struct SecretAgentManApp: App {
     @State private var selectedPRDiff: String = ""
     @State private var selectedPRChanges: [FileChange] = []
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var activityMode: ActivityMode = .agents
+    @State private var activeSidebarPanel: SidebarPanel?
     @State private var selectedPlanURL: URL?
     @AppStorage("shellPanelVisible") private var isShellPanelVisible = false
     @AppStorage("shellPanelHeight") private var shellPanelHeight: Double = 200
@@ -37,7 +37,7 @@ struct SecretAgentManApp: App {
                 HStack(spacing: 0) {
                     NavigationSplitView(columnVisibility: $columnVisibility) {
                         ActivitySidebarView(
-                            mode: $activityMode,
+                            activePanel: $activeSidebarPanel,
                             store: store,
                             branchNames: branchNames,
                             prInfos: prInfos,
@@ -50,44 +50,23 @@ struct SecretAgentManApp: App {
                         )
                     } detail: {
                         ZStack(alignment: .bottom) {
-                            switch activityMode {
-                            case .agents:
-                                ChangesView(changes: fileChanges, fullDiff: fullDiff)
-                            case .plans:
-                                if let url = selectedPlanURL {
-                                    PlanDetailView(url: url)
-                                } else {
-                                    ContentUnavailableView(
-                                        "No Plan Selected",
-                                        systemImage: "doc.text",
-                                        description: Text("Select a plan from the sidebar")
-                                    )
-                                }
-                            case .prs:
-                                if let pr = selectedGitHubPR {
-                                    if selectedPRChanges.isEmpty, !selectedPRDiff.isEmpty {
-                                        ChangesView(changes: selectedPRChanges, fullDiff: selectedPRDiff)
-                                    } else if selectedPRChanges.isEmpty {
-                                        VStack(spacing: 8) {
-                                            ProgressView()
-                                            Text("Loading diff for #\(pr.number)...")
-                                                .font(.system(size: 13))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    } else {
-                                        ChangesView(changes: selectedPRChanges, fullDiff: selectedPRDiff)
-                                    }
-                                } else {
+                            if activeSidebarPanel == .plans, let url = selectedPlanURL {
+                                PlanDetailView(url: url)
+                            } else if activeSidebarPanel == .prs, let pr = selectedGitHubPR {
+                                if selectedPRChanges.isEmpty, !selectedPRDiff.isEmpty {
+                                    ChangesView(changes: selectedPRChanges, fullDiff: selectedPRDiff)
+                                } else if selectedPRChanges.isEmpty {
                                     VStack(spacing: 8) {
-                                        Image("PRIcon")
-                                            .resizable()
-                                            .frame(width: 32, height: 32)
-                                            .foregroundStyle(.secondary)
-                                        Text("Select a PR from the sidebar")
+                                        ProgressView()
+                                        Text("Loading diff for #\(pr.number)...")
                                             .font(.system(size: 13))
                                             .foregroundStyle(.secondary)
                                     }
+                                } else {
+                                    ChangesView(changes: selectedPRChanges, fullDiff: selectedPRDiff)
                                 }
+                            } else {
+                                ChangesView(changes: fileChanges, fullDiff: fullDiff)
                             }
 
                             if isShellPanelVisible {
@@ -231,7 +210,7 @@ struct SecretAgentManApp: App {
                 Divider()
 
                 StatusBarView(
-                    mode: $activityMode,
+                    activePanel: $activeSidebarPanel,
                     store: store,
                     branchNames: branchNames,
                     isShellPanelVisible: $isShellPanelVisible,
@@ -277,7 +256,7 @@ struct SecretAgentManApp: App {
                 let orderedAgents = store.agentsByFolder.flatMap(\.agents)
                 ForEach(Array(orderedAgents.prefix(9).enumerated()), id: \.element.id) { index, agent in
                     Button(agent.name) {
-                        activityMode = .agents
+                        activeSidebarPanel = nil
                         store.selectedAgentId = agent.id
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
@@ -575,8 +554,7 @@ struct SecretAgentManApp: App {
             fullPrompt: prompt
         ))
 
-        // Switch to the target agent
-        activityMode = .agents
+        // Switch to the target agent so the pending prompt appears
         store.selectedAgentId = targetAgent.id
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct StatusBarView: View {
-    @Binding var mode: ActivityMode
+    @Binding var activePanel: SidebarPanel?
     @Bindable var store: AgentStore
     var branchNames: [String: String]
     @Binding var isShellPanelVisible: Bool
@@ -38,9 +38,8 @@ struct StatusBarView: View {
         HStack(spacing: 8) {
             // Left: navigation icons
             HStack(spacing: 2) {
-                activityButton(icon: "person.2", targetMode: .agents, label: "Agents")
-                activityButton(icon: "doc.text", targetMode: .plans, label: "Plans")
-                activityImageButton(image: "PRIcon", targetMode: .prs, label: "Pull Requests")
+                panelToggleButton(icon: "doc.text", panel: .plans, label: "Plans")
+                panelToggleImageButton(image: "PRIcon", panel: .prs, label: "Pull Requests")
             }
 
             Divider()
@@ -175,27 +174,27 @@ struct StatusBarView: View {
         isShellPanelVisible = true
     }
 
-    private func activityButton(icon: String, targetMode: ActivityMode, label: String) -> some View {
+    private func panelToggleButton(icon: String, panel: SidebarPanel, label: String) -> some View {
         Button {
-            mode = targetMode
+            activePanel = activePanel == panel ? nil : panel
         } label: {
             Image(systemName: icon)
                 .font(.system(size: 11))
                 .frame(width: 24, height: 20)
-                .foregroundStyle(mode == targetMode ? Color.accentColor : .secondary)
+                .foregroundStyle(activePanel == panel ? Color.accentColor : .secondary)
         }
         .buttonStyle(.plain)
         .help(label)
     }
 
-    private func activityImageButton(image: String, targetMode: ActivityMode, label: String) -> some View {
+    private func panelToggleImageButton(image: String, panel: SidebarPanel, label: String) -> some View {
         Button {
-            mode = targetMode
+            activePanel = activePanel == panel ? nil : panel
         } label: {
             Image(image)
                 .resizable()
                 .frame(width: 12, height: 12)
-                .foregroundStyle(mode == targetMode ? Color.accentColor : .secondary)
+                .foregroundStyle(activePanel == panel ? Color.accentColor : .secondary)
         }
         .buttonStyle(.plain)
         .help(label)
