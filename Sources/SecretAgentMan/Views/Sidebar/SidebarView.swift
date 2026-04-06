@@ -1,27 +1,26 @@
 import SwiftUI
 
 struct SidebarView: View {
-    @Bindable var store: AgentStore
-    var branchNames: [String: String]
-    var prInfos: [String: PRInfo]
-    var onRemoveAgent: (UUID) -> Void
+    @Environment(AppCoordinator.self) private var coordinator
+    @Binding var selectedPlanURL: URL?
     @State private var showingNewAgent = false
     @State private var renamingAgentId: UUID?
     @State private var renameText = ""
 
     private var sortedAgents: [Agent] {
-        store.agents.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        coordinator.store.agents.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     var body: some View {
+        @Bindable var store = coordinator.store
         List(selection: $store.selectedAgentId) {
             ForEach(sortedAgents) { agent in
                 AgentRowView(
                     agent: agent,
-                    isSelected: store.selectedAgentId == agent.id,
-                    pendingPromptCount: store.pendingPrompts(for: agent.id).count,
-                    branchName: branchNames[agent.folderPath],
-                    prInfo: prInfos[agent.folderPath]
+                    isSelected: coordinator.store.selectedAgentId == agent.id,
+                    pendingPromptCount: coordinator.store.pendingPrompts(for: agent.id).count,
+                    branchName: coordinator.branchNames[agent.folderPath],
+                    prInfo: coordinator.prInfos[agent.folderPath]
                 )
                 .tag(agent.id)
                 .contextMenu {
@@ -31,7 +30,7 @@ struct SidebarView: View {
                     }
                     Divider()
                     Button("Remove", role: .destructive) {
-                        onRemoveAgent(agent.id)
+                        coordinator.removeAgent(agent.id)
                     }
                 }
             }
@@ -50,7 +49,7 @@ struct SidebarView: View {
             }
         }
         .sheet(isPresented: $showingNewAgent) {
-            NewAgentSheet(store: store, isPresented: $showingNewAgent)
+            NewAgentSheet(store: coordinator.store, isPresented: $showingNewAgent)
         }
         .alert("Rename Agent", isPresented: Binding(
             get: { renamingAgentId != nil },
@@ -60,7 +59,7 @@ struct SidebarView: View {
             Button("Cancel", role: .cancel) { renamingAgentId = nil }
             Button("Rename") {
                 if let id = renamingAgentId, !renameText.isEmpty {
-                    store.renameAgent(id: id, name: renameText)
+                    coordinator.store.renameAgent(id: id, name: renameText)
                 }
                 renamingAgentId = nil
             }

@@ -1,19 +1,15 @@
 import SwiftUI
 
 struct StatusBarView: View {
-    @Binding var activePanel: SidebarPanel?
-    @Bindable var store: AgentStore
-    var branchNames: [String: String]
-    @Binding var isShellPanelVisible: Bool
-    @Binding var isAgentPanelVisible: Bool
-    var shellManager: ShellManager
+    @Environment(AppCoordinator.self) private var coordinator
+    @AppStorage("shellPanelVisible") private var isShellPanelVisible = false
 
     @State private var showingMCPPopover = false
     @State private var showingPluginsPopover = false
     @State private var showingScriptsPopover = false
 
     private var selectedAgent: Agent? {
-        store.selectedAgent
+        coordinator.store.selectedAgent
     }
 
     private var mcpServers: [String] {
@@ -31,6 +27,7 @@ struct StatusBarView: View {
     }
 
     var body: some View {
+        @Bindable var coordinator = coordinator
         let mcpServers = mcpServers
         let plugins = plugins
         let scripts = scripts
@@ -47,7 +44,6 @@ struct StatusBarView: View {
 
             // Center-left: per-agent context
             HStack(spacing: 10) {
-                // MCP servers
                 Button {
                     showingMCPPopover.toggle()
                 } label: {
@@ -69,7 +65,6 @@ struct StatusBarView: View {
                     )
                 }
 
-                // Plugins
                 Button {
                     showingPluginsPopover.toggle()
                 } label: {
@@ -91,7 +86,6 @@ struct StatusBarView: View {
                     )
                 }
 
-                // Scripts
                 Button {
                     showingScriptsPopover.toggle()
                 } label: {
@@ -127,11 +121,11 @@ struct StatusBarView: View {
             .help("Toggle Terminal (Cmd+J)")
 
             Button {
-                isAgentPanelVisible.toggle()
+                coordinator.isAgentPanelVisible.toggle()
             } label: {
                 Image(systemName: "sparkle")
                     .font(.system(size: 11))
-                    .foregroundStyle(isAgentPanelVisible ? Color.accentColor : .secondary)
+                    .foregroundStyle(coordinator.isAgentPanelVisible ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
             .help("Toggle Agent Panel")
@@ -140,10 +134,9 @@ struct StatusBarView: View {
                 .frame(height: 16)
                 .padding(.horizontal, 8)
 
-            // Agent info
             if let agent = selectedAgent {
                 HStack(spacing: 8) {
-                    if let branch = branchNames[agent.folderPath] {
+                    if let branch = coordinator.branchNames[agent.folderPath] {
                         HStack(spacing: 3) {
                             Image(systemName: "arrow.triangle.branch")
                                 .font(.system(size: 10))
@@ -170,18 +163,18 @@ struct StatusBarView: View {
 
     private func runScript(_ script: ProjectScript) {
         guard let agent = selectedAgent else { return }
-        shellManager.sendCommand(script.command, for: agent)
+        coordinator.shellManager.sendCommand(script.command, for: agent)
         isShellPanelVisible = true
     }
 
     private func panelToggleButton(icon: String, panel: SidebarPanel, label: String) -> some View {
         Button {
-            activePanel = activePanel == panel ? nil : panel
+            coordinator.activeSidebarPanel = coordinator.activeSidebarPanel == panel ? nil : panel
         } label: {
             Image(systemName: icon)
                 .font(.system(size: 11))
                 .frame(width: 24, height: 20)
-                .foregroundStyle(activePanel == panel ? Color.accentColor : .secondary)
+                .foregroundStyle(coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary)
         }
         .buttonStyle(.plain)
         .help(label)
@@ -189,12 +182,12 @@ struct StatusBarView: View {
 
     private func panelToggleImageButton(image: String, panel: SidebarPanel, label: String) -> some View {
         Button {
-            activePanel = activePanel == panel ? nil : panel
+            coordinator.activeSidebarPanel = coordinator.activeSidebarPanel == panel ? nil : panel
         } label: {
             Image(image)
                 .resizable()
                 .frame(width: 12, height: 12)
-                .foregroundStyle(activePanel == panel ? Color.accentColor : .secondary)
+                .foregroundStyle(coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary)
         }
         .buttonStyle(.plain)
         .help(label)
