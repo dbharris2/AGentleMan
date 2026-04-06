@@ -9,6 +9,7 @@ struct SecretAgentManApp: App {
     @State private var fileChanges: [FileChange] = []
     @State private var fullDiff: String = ""
     @State private var fileWatcher = FileSystemWatcher()
+    @State private var sessionWatcher = FileSystemWatcher()
     @State private var prTimer: Timer?
     @State private var branchNames: [String: String] = [:]
     @State private var prInfos: [String: PRInfo] = [:]
@@ -144,6 +145,7 @@ struct SecretAgentManApp: App {
                 }
                 .onDisappear {
                     fileWatcher.unwatchAll()
+                    sessionWatcher.unwatchAll()
                     prTimer?.invalidate()
                 }
                 .onChange(of: store.agents.map(\.folder)) { oldFolders, newFolders in
@@ -151,9 +153,15 @@ struct SecretAgentManApp: App {
                     let newSet = Set(newFolders)
                     for removed in oldSet.subtracting(newSet) {
                         fileWatcher.unwatch(directory: removed)
+                        sessionWatcher.unwatch(
+                            directory: SessionFileDetector.claudeProjectDir(for: removed)
+                        )
                     }
                     for added in newSet.subtracting(oldSet) {
                         fileWatcher.watch(directory: added)
+                        sessionWatcher.watch(
+                            directory: SessionFileDetector.claudeProjectDir(for: added)
+                        )
                     }
                 }
 
@@ -218,6 +226,26 @@ struct SecretAgentManApp: App {
         }
         for folder in Set(store.agents.map(\.folder)) {
             fileWatcher.watch(directory: folder)
+        }
+        setupSessionWatcher()
+    }
+
+    private func setupSessionWatcher() {
+        sessionWatcher.onDirectoryChanged = { _ in
+            // Only update agents whose session file no longer exists
+            // (Claude Code replaced it with a new session)
+            for agent in store.agents {
+                guard let sessionId = agent.sessionId,
+                      !SessionFileDetector.sessionFileExists(sessionId, for: agent.folder),
+                      let actual = SessionFileDetector.latestSessionId(for: agent.folder)
+                else { continue }
+                store.updateSessionId(id: agent.id, sessionId: actual)
+            }
+        }
+        // Watch each agent's Claude project directory
+        for folder in Set(store.agents.map(\.folder)) {
+            let projectDir = SessionFileDetector.claudeProjectDir(for: folder)
+            sessionWatcher.watch(directory: projectDir)
         }
     }
 
