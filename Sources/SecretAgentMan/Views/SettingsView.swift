@@ -91,7 +91,7 @@ struct GeneralSettingsView: View {
                 ThemePreviewLarge(themeName: selectedTheme)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(selectedTheme)
-                        .font(.system(size: 14, weight: .semibold))
+                        .scaledFont(size: 14, weight: .semibold)
                     Text("Current theme")
                         .font(.caption)
                         .foregroundStyle(.secondary)

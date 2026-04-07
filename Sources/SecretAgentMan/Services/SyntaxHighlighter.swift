@@ -30,7 +30,7 @@ enum SyntaxHighlighter {
 
     /// Highlight a single line of code, returning an AttributedString.
     /// Returns nil if highlighting fails (caller should fall back to plain text).
-    static func highlight(_ code: String, language: String?) -> AttributedString? {
+    static func highlight(_ code: String, language: String?, fontSize: CGFloat = 12) -> AttributedString? {
         guard let highlightr,
               let lang = language,
               let nsAttr = highlightr.highlight(code, as: lang, fastRender: true)
@@ -38,8 +38,10 @@ enum SyntaxHighlighter {
             return nil
         }
 
-        // Convert NSAttributedString to SwiftUI AttributedString
-        return try? AttributedString(nsAttr, including: \.appKit)
+        let mutable = NSMutableAttributedString(attributedString: nsAttr)
+        let monoFont = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        mutable.addAttribute(.font, value: monoFont, range: NSRange(location: 0, length: mutable.length))
+        return try? AttributedString(mutable, including: \.appKit)
     }
 
     /// Extract the file extension from a "diff --git a/path b/path" line.

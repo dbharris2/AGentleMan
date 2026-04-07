@@ -134,7 +134,13 @@ final class TerminalManager {
     }
 
     /// Read terminal font from Ghostty config, falling back to system monospace.
+    /// Applies the user's font scale preference.
     static func terminalFont() -> NSFont {
+        let scale = UserDefaults.standard.double(forKey: UserDefaultsKeys.fontScale)
+        let effectiveScale = scale > 0 ? scale : 1.0
+        let baseSize: CGFloat = 13
+        let size = baseSize * effectiveScale
+
         if let config = try? String(
             contentsOfFile: NSHomeDirectory() + "/.config/ghostty/config",
             encoding: .utf8
@@ -145,14 +151,21 @@ final class TerminalManager {
                     let parts = trimmed.split(separator: "=", maxSplits: 1)
                     if parts.count == 2 {
                         let fontName = parts[1].trimmingCharacters(in: .whitespaces)
-                        if let font = NSFont(name: fontName, size: 13) {
+                        if let font = NSFont(name: fontName, size: size) {
                             return font
                         }
                     }
                 }
             }
         }
-        return NSFont(name: "Monaco", size: 13) ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        return NSFont(name: "Monaco", size: size) ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    func applyFontToAll() {
+        let font = Self.terminalFont()
+        for terminal in terminals.values {
+            terminal.font = font
+        }
     }
 
     private func applyThemeToAll() {

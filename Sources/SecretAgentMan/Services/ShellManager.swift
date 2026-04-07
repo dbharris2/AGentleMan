@@ -10,6 +10,13 @@ final class ShellManager {
         didSet { applyThemeToAll() }
     }
 
+    func applyFontToAll() {
+        let font = TerminalManager.terminalFont()
+        for terminal in terminals.values {
+            terminal.font = font
+        }
+    }
+
     private func applyThemeToAll() {
         for terminal in terminals.values {
             applyTheme(to: terminal)

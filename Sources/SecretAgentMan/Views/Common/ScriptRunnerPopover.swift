@@ -15,13 +15,13 @@ struct ScriptRunnerPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Scripts")
-                .font(.system(size: 12, weight: .semibold))
+                .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
             Divider()
 
             if scripts.isEmpty {
                 Text("No scripts detected")
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView {
@@ -30,9 +30,9 @@ struct ScriptRunnerPopover: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 4) {
                                     Image(systemName: group.source.icon)
-                                        .font(.system(size: 9))
+                                        .scaledFont(size: 9)
                                     Text(group.source.rawValue)
-                                        .font(.system(size: 11, weight: .medium))
+                                        .scaledFont(size: 11, weight: .medium)
                                 }
                                 .foregroundStyle(.secondary)
                                 .padding(.bottom, 2)
@@ -62,10 +62,10 @@ private struct ScriptRow: View {
         } label: {
             HStack {
                 Text(script.name)
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                 Spacer()
                 Image(systemName: "play.fill")
-                    .font(.system(size: 9))
+                    .scaledFont(size: 9)
                     .foregroundStyle(.secondary)
             }
             .contentShape(Rectangle())

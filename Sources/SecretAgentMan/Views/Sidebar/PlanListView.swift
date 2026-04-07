@@ -11,11 +11,11 @@ struct PlanListView: View {
         List(plans, selection: $selectedPlanURL) { plan in
             VStack(alignment: .leading, spacing: 2) {
                 Text(plan.title)
-                    .font(.system(size: 13))
+                    .scaledFont(size: 13)
                     .lineLimit(1)
 
                 Text(plan.filename)
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
