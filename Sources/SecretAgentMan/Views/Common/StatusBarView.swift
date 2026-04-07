@@ -19,7 +19,8 @@ struct StatusBarView: View {
     }
 
     private var plugins: [String] {
-        MCPConfigLoader.loadPluginNames()
+        guard let agent = selectedAgent else { return [] }
+        return MCPConfigLoader.loadPluginNames(for: agent.provider)
     }
 
     private var scripts: [ProjectScript] {
@@ -29,7 +30,7 @@ struct StatusBarView: View {
 
     private var skills: [SkillInfo] {
         guard let agent = selectedAgent else { return [] }
-        return MCPConfigLoader.loadSkills(in: agent.folder)
+        return MCPConfigLoader.loadSkills(in: agent.folder, provider: agent.provider)
     }
 
     var body: some View {
@@ -152,7 +153,9 @@ struct StatusBarView: View {
             } label: {
                 Image(systemName: "sparkle")
                     .scaledFont(size: 11)
-                    .foregroundStyle(coordinator.isAgentPanelVisible ? Color.accentColor : .secondary)
+                    .foregroundStyle(
+                        coordinator.isAgentPanelVisible ? Color.accentColor : .secondary
+                    )
             }
             .buttonStyle(.plain)
             .help("Toggle Agent Panel")
@@ -163,6 +166,12 @@ struct StatusBarView: View {
 
             if let agent = selectedAgent {
                 HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text(agent.provider.displayName)
+                            .scaledFont(size: 11)
+                            .foregroundStyle(.secondary)
+                    }
+
                     if let branch = coordinator.branchNames[agent.folderPath] {
                         HStack(spacing: 3) {
                             Image(systemName: "arrow.triangle.branch")
@@ -207,20 +216,25 @@ struct StatusBarView: View {
             Image(systemName: icon)
                 .scaledFont(size: 11)
                 .frame(width: 24, height: 20)
-                .foregroundStyle(coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary)
+                .foregroundStyle(
+                    coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary
+                )
         }
         .buttonStyle(.plain)
         .help(label)
     }
 
-    private func panelToggleImageButton(image: String, panel: SidebarPanel, label: String) -> some View {
+    private func panelToggleImageButton(image: String, panel: SidebarPanel, label: String)
+        -> some View {
         Button {
             coordinator.activeSidebarPanel = coordinator.activeSidebarPanel == panel ? nil : panel
         } label: {
             Image(image)
                 .resizable()
                 .frame(width: 12, height: 12)
-                .foregroundStyle(coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary)
+                .foregroundStyle(
+                    coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary
+                )
         }
         .buttonStyle(.plain)
         .help(label)

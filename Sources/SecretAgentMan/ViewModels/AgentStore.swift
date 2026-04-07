@@ -47,8 +47,19 @@ final class AgentStore {
             .map { (folder: $0.key, agents: $0.value.sorted { $0.createdAt < $1.createdAt }) }
     }
 
-    func addAgent(name: String, folder: URL, initialPrompt: String? = nil) -> Agent {
-        let agent = Agent(name: name, folder: folder, sessionId: UUID().uuidString, initialPrompt: initialPrompt)
+    func addAgent(
+        name: String,
+        folder: URL,
+        provider: AgentProvider = .claude,
+        initialPrompt: String? = nil
+    ) -> Agent {
+        let agent = Agent(
+            name: name,
+            folder: folder,
+            provider: provider,
+            sessionId: UUID().uuidString,
+            initialPrompt: initialPrompt
+        )
         agents.append(agent)
         selectedAgentId = agent.id
         save()

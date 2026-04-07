@@ -7,6 +7,7 @@ struct NewAgentSheet: View {
     @AppStorage(UserDefaultsKeys.defaultAgentFolder) private var defaultAgentFolder = ""
     @State private var name = ""
     @State private var selectedFolder: URL?
+    @State private var selectedProvider: AgentProvider = .claude
     @State private var initialPrompt = ""
 
     var body: some View {
@@ -16,6 +17,13 @@ struct NewAgentSheet: View {
 
             TextField("Name", text: $name)
                 .textFieldStyle(.roundedBorder)
+
+            Picker("Provider", selection: $selectedProvider) {
+                ForEach(AgentProvider.allCases) { provider in
+                    Text(provider.displayName).tag(provider)
+                }
+            }
+            .pickerStyle(.segmented)
 
             HStack {
                 Text(selectedFolder?.path ?? "No folder selected")
@@ -81,7 +89,12 @@ struct NewAgentSheet: View {
 
     private func createAgent() {
         guard let folder = selectedFolder else { return }
-        _ = store.addAgent(name: name, folder: folder, initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt)
+        _ = store.addAgent(
+            name: name,
+            folder: folder,
+            provider: selectedProvider,
+            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt
+        )
         isPresented = false
     }
 }

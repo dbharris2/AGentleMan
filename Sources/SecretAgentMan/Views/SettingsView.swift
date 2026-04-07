@@ -21,7 +21,7 @@ struct GeneralSettingsView: View {
     let shellManager: ShellManager
 
     @AppStorage(UserDefaultsKeys.terminalTheme) private var selectedTheme = "Catppuccin Mocha"
-    @AppStorage(UserDefaultsKeys.pluginDirectory) private var pluginDirectory = ""
+    @AppStorage(UserDefaultsKeys.claudePluginDirectory) private var claudePluginDirectory = ""
     @AppStorage(UserDefaultsKeys.defaultAgentFolder) private var defaultAgentFolder = ""
     @State private var searchText = ""
     @State private var allThemes: [String] = []
@@ -64,7 +64,7 @@ struct GeneralSettingsView: View {
                     .font(.headline)
 
                 HStack {
-                    TextField("Plugin directory path", text: $pluginDirectory)
+                    TextField("Plugin directory path", text: $claudePluginDirectory)
                         .textFieldStyle(.roundedBorder)
 
                     Button("Browse...") {
@@ -72,7 +72,7 @@ struct GeneralSettingsView: View {
                         panel.canChooseDirectories = true
                         panel.canChooseFiles = false
                         if panel.runModal() == .OK, let url = panel.url {
-                            pluginDirectory = url.path
+                            claudePluginDirectory = url.path
                         }
                     }
                 }
@@ -80,6 +80,20 @@ struct GeneralSettingsView: View {
                 Text("Passed as --plugin-dir to new Claude sessions")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            Section {
+                Text("Codex")
+                    .font(.headline)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Configuration is read from ~/.codex/config.toml")
+                    Text("Plugins and MCP servers are discovered from ~/.codex")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Divider()

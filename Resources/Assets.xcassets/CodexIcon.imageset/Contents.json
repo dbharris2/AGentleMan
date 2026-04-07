@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "claude_24.png",
+      "filename" : "codex_24.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "claude_48.png",
+      "filename" : "codex_48.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "claude_72.png",
+      "filename" : "codex_72.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
@@ -22,6 +22,6 @@
   },
   "properties" : {
     "preserves-vector-representation" : true,
-    "template-rendering-intent" : "original"
+    "template-rendering-intent" : "template"
   }
 }

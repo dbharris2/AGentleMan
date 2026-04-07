@@ -100,15 +100,15 @@ final class AppCoordinator {
         let newSet = Set(newFolders)
         for removed in oldSet.subtracting(newSet) {
             fileWatcher.unwatch(directory: removed)
-            sessionWatcher.unwatch(
-                directory: SessionFileDetector.claudeProjectDir(for: removed)
-            )
+            for agent in store.agents where agent.folder == removed {
+                sessionWatcher.unwatch(directory: SessionFileDetector.sessionDirectory(for: agent))
+            }
         }
         for added in newSet.subtracting(oldSet) {
             fileWatcher.watch(directory: added)
-            sessionWatcher.watch(
-                directory: SessionFileDetector.claudeProjectDir(for: added)
-            )
+            for agent in store.agents where agent.folder == added {
+                sessionWatcher.watch(directory: SessionFileDetector.sessionDirectory(for: agent))
+            }
         }
     }
 
@@ -197,7 +197,8 @@ final class AppCoordinator {
         let previousSelection = store.selectedAgentId
         let reviewAgent = store.addAgent(
             name: "PR #\(pr.number) - Review",
-            folder: folder
+            folder: folder,
+            provider: .claude
         )
         store.selectedAgentId = previousSelection
 
@@ -256,15 +257,14 @@ final class AppCoordinator {
         sessionWatcher.onDirectoryChanged = { [self] _ in
             for agent in store.agents {
                 guard let sessionId = agent.sessionId,
-                      !SessionFileDetector.sessionFileExists(sessionId, for: agent.folder),
-                      let actual = SessionFileDetector.latestSessionId(for: agent.folder)
+                      !SessionFileDetector.sessionFileExists(sessionId, for: agent),
+                      let actual = SessionFileDetector.latestSessionId(for: agent)
                 else { continue }
                 store.updateSessionId(id: agent.id, sessionId: actual)
             }
         }
-        for folder in Set(store.agents.map(\.folder)) {
-            let projectDir = SessionFileDetector.claudeProjectDir(for: folder)
-            sessionWatcher.watch(directory: projectDir)
+        for agent in store.agents {
+            sessionWatcher.watch(directory: SessionFileDetector.sessionDirectory(for: agent))
         }
     }
 

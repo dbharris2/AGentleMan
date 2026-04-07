@@ -10,54 +10,70 @@ enum MCPConfigLoader {
         return servers.keys.sorted()
     }
 
-    static func loadPluginNames() -> [String] {
-        guard let plugins = loadInstalledPlugins() else { return [] }
-        return plugins.keys.map { $0.components(separatedBy: "@").first ?? $0 }.sorted()
+    static func loadPluginNames(for provider: AgentProvider) -> [String] {
+        switch provider {
+        case .claude:
+            guard let plugins = loadClaudeInstalledPlugins() else { return [] }
+            return plugins.keys.map { $0.components(separatedBy: "@").first ?? $0 }.sorted()
+        case .codex:
+            return loadCodexPluginNames()
+        }
     }
 
-    static func loadSkills(in directory: URL) -> [SkillInfo] {
+    static func loadSkills(in directory: URL, provider: AgentProvider = .claude) -> [SkillInfo] {
         var skills: [SkillInfo] = []
 
         // Repo-local skills
+        let repoSkillDir = provider == .claude ? ".claude/skills" : ".codex/skills"
         skills.append(contentsOf: scanSkillsDir(
-            directory.appendingPathComponent(".claude/skills"), source: "local"
+            directory.appendingPathComponent(repoSkillDir), source: "local"
         ))
 
-        // Local plugin directory skills
-        let pluginDir = UserDefaults.standard.string(forKey: UserDefaultsKeys.pluginDirectory) ?? ""
-        if !pluginDir.isEmpty {
-            let expanded = (pluginDir as NSString).expandingTildeInPath
-            let pluginDirURL = URL(fileURLWithPath: expanded)
-            let pluginName = pluginDirURL.lastPathComponent
+        switch provider {
+        case .claude:
+            let pluginDir = UserDefaults.standard.string(forKey: UserDefaultsKeys.claudePluginDirectory) ?? ""
+            if !pluginDir.isEmpty {
+                let expanded = (pluginDir as NSString).expandingTildeInPath
+                let pluginDirURL = URL(fileURLWithPath: expanded)
+                let pluginName = pluginDirURL.lastPathComponent
 
-            // Plugin dir is the plugin itself
-            skills.append(contentsOf: scanSkillsDir(
-                pluginDirURL.appendingPathComponent("skills"), source: pluginName
-            ))
+                skills.append(contentsOf: scanSkillsDir(
+                    pluginDirURL.appendingPathComponent("skills"), source: pluginName
+                ))
 
-            // Plugin dir contains multiple plugins
-            if let entries = try? FileManager.default.contentsOfDirectory(
-                at: pluginDirURL, includingPropertiesForKeys: nil
-            ) {
-                for entry in entries where entry.lastPathComponent != "skills" {
+                if let entries = try? FileManager.default.contentsOfDirectory(
+                    at: pluginDirURL, includingPropertiesForKeys: nil
+                ) {
+                    for entry in entries where entry.lastPathComponent != "skills" {
+                        skills.append(contentsOf: scanSkillsDir(
+                            entry.appendingPathComponent("skills"), source: entry.lastPathComponent
+                        ))
+                    }
+                }
+            }
+
+            if let plugins = loadClaudeInstalledPlugins() {
+                for (key, value) in plugins {
+                    let name = key.components(separatedBy: "@").first ?? key
+                    guard let entries = value as? [[String: Any]],
+                          let first = entries.first,
+                          let installPath = first["installPath"] as? String
+                    else { continue }
                     skills.append(contentsOf: scanSkillsDir(
-                        entry.appendingPathComponent("skills"), source: entry.lastPathComponent
+                        URL(fileURLWithPath: installPath).appendingPathComponent("skills"),
+                        source: name
                     ))
                 }
             }
-        }
-
-        // Marketplace plugin skills
-        if let plugins = loadInstalledPlugins() {
-            for (key, value) in plugins {
-                let name = key.components(separatedBy: "@").first ?? key
-                guard let entries = value as? [[String: Any]],
-                      let first = entries.first,
-                      let installPath = first["installPath"] as? String
-                else { continue }
+        case .codex:
+            skills.append(contentsOf: scanSkillsDir(
+                URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".codex/skills"),
+                source: "codex"
+            ))
+            for plugin in loadCodexPluginEntries() {
                 skills.append(contentsOf: scanSkillsDir(
-                    URL(fileURLWithPath: installPath).appendingPathComponent("skills"),
-                    source: name
+                    plugin.appendingPathComponent("skills"),
+                    source: plugin.lastPathComponent
                 ))
             }
         }
@@ -67,7 +83,7 @@ enum MCPConfigLoader {
 
     // MARK: - Private
 
-    private static func loadInstalledPlugins() -> [String: Any]? {
+    private static func loadClaudeInstalledPlugins() -> [String: Any]? {
         let pluginsFile = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".claude/plugins/installed_plugins.json")
         guard let data = try? Data(contentsOf: pluginsFile),
@@ -75,6 +91,25 @@ enum MCPConfigLoader {
               let plugins = json["plugins"] as? [String: Any]
         else { return nil }
         return plugins
+    }
+
+    private static func loadCodexPluginNames() -> [String] {
+        loadCodexPluginEntries()
+            .map(\.lastPathComponent)
+            .sorted()
+    }
+
+    private static func loadCodexPluginEntries() -> [URL] {
+        let dir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".codex/plugins/cache")
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        return entries.filter {
+            ((try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false)
+        }
     }
 
     private static func scanSkillsDir(_ skillsDir: URL, source: String) -> [SkillInfo] {

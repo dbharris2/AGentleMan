@@ -61,14 +61,13 @@ final class TerminalManager {
         // re-renders, which re-enter updateNSView, creating a main thread
         // feedback loop (beachball). The async dispatch breaks the cycle.
         let pm = processManager
-        let folder = agent.folder
         let prompt = agent.hasLaunched ? nil : agent.initialPrompt
         let sessionId = agent.sessionId
         let hasLaunched = agent.hasLaunched
         DispatchQueue.main.async { [weak self] in
             pm.startAgent(
                 terminal: terminal,
-                folder: folder,
+                agent: agent,
                 initialPrompt: prompt,
                 sessionId: sessionId,
                 hasLaunched: hasLaunched
