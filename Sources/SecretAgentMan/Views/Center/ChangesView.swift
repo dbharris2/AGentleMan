@@ -67,12 +67,12 @@ struct ChangesView: View {
                 ForEach(changes) { change in
                     HStack(spacing: 8) {
                         Text(change.status.label)
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .scaledFont(size: 11, weight: .medium, design: .monospaced)
                             .foregroundStyle(statusColor(change.status))
                             .frame(width: 14, alignment: .center)
 
                         Text(change.path)
-                            .font(.system(size: 12, design: .monospaced))
+                            .scaledFont(size: 12, design: .monospaced)
                             .lineLimit(1)
                             .truncationMode(.middle)
 
@@ -81,12 +81,12 @@ struct ChangesView: View {
                         HStack(spacing: 6) {
                             if change.insertions > 0 {
                                 Text("+\(change.insertions)")
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .scaledFont(size: 11, weight: .medium, design: .monospaced)
                                     .foregroundStyle(.green)
                             }
                             if change.deletions > 0 {
                                 Text("-\(change.deletions)")
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .scaledFont(size: 11, weight: .medium, design: .monospaced)
                                     .foregroundStyle(.red)
                             }
                         }

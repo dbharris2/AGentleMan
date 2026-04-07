@@ -26,15 +26,15 @@ struct VersionBadgeView: View {
             HStack(spacing: 4) {
                 if isDebug {
                     Text("DEBUG")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11, weight: .bold, design: .monospaced)
                         .foregroundStyle(.yellow)
                 } else {
                     Text(verbatim: "v\(currentVersion)")
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundStyle(isOutdated ? .orange : .secondary)
                     if isOutdated {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 10))
+                            .scaledFont(size: 10)
                             .foregroundStyle(.orange)
                     }
                 }

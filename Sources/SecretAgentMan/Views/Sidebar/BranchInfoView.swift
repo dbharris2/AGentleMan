@@ -5,7 +5,7 @@ struct BranchInfoView: View {
 
     var body: some View {
         Text(branchName)
-            .font(.system(size: 11))
+            .scaledFont(size: 11)
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .truncationMode(.tail)

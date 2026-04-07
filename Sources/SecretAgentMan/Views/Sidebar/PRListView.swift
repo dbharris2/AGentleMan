@@ -95,15 +95,15 @@ struct PRListView: View {
                     } label: {
                         HStack(alignment: .center) {
                             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 10, weight: .semibold))
+                                .scaledFont(size: 10, weight: .semibold)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 12)
                             Text(item.section.rawValue)
-                                .font(.system(size: 13))
+                                .scaledFont(size: 13)
                                 .foregroundStyle(.primary)
                             Spacer()
                             Text(verbatim: "\(item.prs.count)")
-                                .font(.system(size: 9, weight: .bold))
+                                .scaledFont(size: 9, weight: .bold)
                                 .foregroundStyle(.white)
                                 .frame(minWidth: 16, minHeight: 16)
                                 .padding(.horizontal, 3)
@@ -167,7 +167,7 @@ struct PRRowView: View {
                     image.resizable()
                 } placeholder: {
                     Text(verbatim: String(pr.authorLogin.prefix(2)))
-                        .font(.system(size: 9, weight: .medium))
+                        .scaledFont(size: 9, weight: .medium)
                         .foregroundStyle(.white)
                 }
                 .frame(width: 24, height: 24)
@@ -179,37 +179,37 @@ struct PRRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(pr.title)
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .lineLimit(1)
 
                     Spacer()
 
                     Text(Self.relativeDate(pr.updatedAt))
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                         .foregroundStyle(.secondary)
                 }
 
                 HStack(spacing: 6) {
                     Text(verbatim: "\(pr.repository) #\(pr.number)")
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                         .foregroundStyle(.secondary)
 
                     Text(verbatim: "+\(pr.additions)")
-                        .font(.system(size: 10, design: .monospaced))
+                        .scaledFont(size: 10, design: .monospaced)
                         .foregroundStyle(.green)
                     Text(verbatim: "-\(pr.deletions)")
-                        .font(.system(size: 10, design: .monospaced))
+                        .scaledFont(size: 10, design: .monospaced)
                         .foregroundStyle(.red)
                     Text(verbatim: "@\(pr.changedFiles)")
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                         .foregroundStyle(.secondary)
 
                     if pr.commentCount > 0 {
                         HStack(spacing: 2) {
                             Image(systemName: "bubble.left")
-                                .font(.system(size: 9))
+                                .scaledFont(size: 9)
                             Text(verbatim: "\(pr.commentCount)")
-                                .font(.system(size: 10))
+                                .scaledFont(size: 10)
                         }
                         .foregroundStyle(.secondary)
                     }
@@ -221,7 +221,7 @@ struct PRRowView: View {
                             image.resizable()
                         } placeholder: {
                             Text(verbatim: String(reviewer.login.prefix(2)))
-                                .font(.system(size: 7, weight: .medium))
+                                .scaledFont(size: 7, weight: .medium)
                                 .foregroundStyle(.white)
                         }
                         .frame(width: 16, height: 16)
@@ -232,7 +232,7 @@ struct PRRowView: View {
 
                     if pr.checkStatus != .none {
                         Image(systemName: "flask.fill")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                             .foregroundStyle(pr.checkStatus.color)
                             .help(pr.checkStatus.label)
                     }

@@ -15,7 +15,7 @@ struct AgentRowView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(agent.name)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .scaledFont(size: 13, weight: isSelected ? .semibold : .regular)
                     .lineLimit(1)
 
                 if let branch = branchName {
@@ -31,7 +31,7 @@ struct AgentRowView: View {
 
             if pendingPromptCount > 0 {
                 Text(verbatim: "\(pendingPromptCount)")
-                    .font(.system(size: 10, weight: .bold))
+                    .scaledFont(size: 10, weight: .bold)
                     .foregroundStyle(.white)
                     .frame(minWidth: 16, minHeight: 16)
                     .background(.red)

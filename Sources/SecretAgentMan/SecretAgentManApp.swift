@@ -8,6 +8,11 @@ struct SecretAgentManApp: App {
         WindowGroup("Secret Agent Man") {
             ContentView()
                 .environment(coordinator)
+                .environment(\.fontScale, fontScale)
+                .onChange(of: fontScale) {
+                    coordinator.terminalManager.applyFontToAll()
+                    coordinator.shellManager.applyFontToAll()
+                }
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
@@ -25,6 +30,23 @@ struct SecretAgentManApp: App {
                     isShellPanelVisible.toggle()
                 }
                 .keyboardShortcut("j")
+
+                Divider()
+
+                Button("Zoom In") {
+                    fontScale = min(fontScale + 0.1, 2.0)
+                }
+                .keyboardShortcut("+")
+
+                Button("Zoom Out") {
+                    fontScale = max(fontScale - 0.1, 0.5)
+                }
+                .keyboardShortcut("-")
+
+                Button("Reset Zoom") {
+                    fontScale = 1.0
+                }
+                .keyboardShortcut("0")
             }
             CommandMenu("Debug") {
                 Button("Test Pending Prompt") {
@@ -59,4 +81,5 @@ struct SecretAgentManApp: App {
     }
 
     @AppStorage("shellPanelVisible") private var isShellPanelVisible = false
+    @AppStorage(UserDefaultsKeys.fontScale) private var fontScale = 1.0
 }

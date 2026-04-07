@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DiffView: View {
     let diffText: String
+    @Environment(\.fontScale) private var fontScale
     @AppStorage(UserDefaultsKeys.terminalTheme) private var themeName = "Catppuccin Mocha"
 
     private var theme: GhosttyTheme? {
@@ -52,7 +53,7 @@ struct DiffView: View {
         switch kind {
         case .fileHeader:
             Text(line)
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .scaledFont(size: 12, weight: .bold, design: .monospaced)
                 .foregroundStyle(Color(nsColor: fg ?? .white))
                 .padding(.horizontal, 8)
                 .padding(.top, 12)
@@ -62,7 +63,7 @@ struct DiffView: View {
 
         case .hunkHeader:
             Text(line)
-                .font(.system(size: 12, design: .monospaced))
+                .scaledFont(size: 12, design: .monospaced)
                 .foregroundStyle(Color(nsColor: .systemCyan))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2)
@@ -87,7 +88,7 @@ struct DiffView: View {
 
         case .meta:
             Text(line)
-                .font(.system(size: 11, design: .monospaced))
+                .scaledFont(size: 11, design: .monospaced)
                 .foregroundStyle(contextColor)
                 .padding(.horizontal, 8)
         }
@@ -102,13 +103,21 @@ struct DiffView: View {
     ) -> some View {
         // Strip the diff prefix for highlighting, then display with prefix
         let code = line.hasPrefix(prefix) ? String(line.dropFirst()) : line
-        if let highlighted = SyntaxHighlighter.highlight(code, language: lang) {
-            Text(prefix) + Text(highlighted)
+        let scaledSize = 12 * fontScale
+        if let highlighted = SyntaxHighlighter.highlight(code, language: lang, fontSize: scaledSize) {
+            let prefixAttr = Self.monoAttributedString(prefix, size: scaledSize)
+            Text(prefixAttr) + Text(highlighted)
         } else {
             Text(line.isEmpty ? " " : line)
-                .font(.system(size: 12, design: .monospaced))
+                .scaledFont(size: 12, design: .monospaced)
                 .foregroundStyle(fallbackColor)
         }
+    }
+
+    private static func monoAttributedString(_ text: String, size: CGFloat) -> AttributedString {
+        var attr = AttributedString(text)
+        attr.font = .monospacedSystemFont(ofSize: size, weight: .regular)
+        return attr
     }
 
     private enum LineKind {

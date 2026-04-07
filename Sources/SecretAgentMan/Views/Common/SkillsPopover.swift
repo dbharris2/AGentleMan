@@ -20,13 +20,13 @@ struct SkillsPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Skills")
-                .font(.system(size: 12, weight: .semibold))
+                .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
             Divider()
 
             if skills.isEmpty {
                 Text("No skills available")
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView {
@@ -35,9 +35,9 @@ struct SkillsPopover: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 4) {
                                     Image(systemName: group.source == "local" ? "folder" : "puzzlepiece.extension")
-                                        .font(.system(size: 9))
+                                        .scaledFont(size: 9)
                                     Text(group.source)
-                                        .font(.system(size: 11, weight: .medium))
+                                        .scaledFont(size: 11, weight: .medium)
                                 }
                                 .foregroundStyle(.secondary)
                                 .padding(.bottom, 2)
@@ -68,17 +68,17 @@ private struct SkillRow: View {
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("/\(skill.name)")
-                        .font(.system(size: 12, weight: .medium))
+                        .scaledFont(size: 12, weight: .medium)
                     if !skill.description.isEmpty {
                         Text(skill.description)
-                            .font(.system(size: 10))
+                            .scaledFont(size: 10)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                     }
                 }
                 Spacer()
                 Image(systemName: "paperplane.fill")
-                    .font(.system(size: 9))
+                    .scaledFont(size: 9)
                     .foregroundStyle(.secondary)
             }
             .contentShape(Rectangle())

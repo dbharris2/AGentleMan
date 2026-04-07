@@ -56,9 +56,9 @@ struct StatusBarView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "server.rack")
-                            .font(.system(size: 10))
+                            .scaledFont(size: 10)
                         Text(verbatim: "\(mcpServers.count) MCP")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                     }
                     .foregroundStyle(mcpServers.isEmpty ? .secondary : .primary)
                 }
@@ -77,9 +77,9 @@ struct StatusBarView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "puzzlepiece.extension")
-                            .font(.system(size: 10))
+                            .scaledFont(size: 10)
                         Text(verbatim: "\(plugins.count) Plugins")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                     }
                     .foregroundStyle(plugins.isEmpty ? .secondary : .primary)
                 }
@@ -98,9 +98,9 @@ struct StatusBarView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 10))
+                            .scaledFont(size: 10)
                         Text(verbatim: "\(skills.count) Skills")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                     }
                     .foregroundStyle(skills.isEmpty ? .secondary : .primary)
                 }
@@ -118,9 +118,9 @@ struct StatusBarView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "play.rectangle")
-                            .font(.system(size: 10))
+                            .scaledFont(size: 10)
                         Text(verbatim: "\(scripts.count) Scripts")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                     }
                     .foregroundStyle(scripts.isEmpty ? .secondary : .primary)
                 }
@@ -141,7 +141,7 @@ struct StatusBarView: View {
                 isShellPanelVisible.toggle()
             } label: {
                 Image(systemName: "terminal")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(isShellPanelVisible ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
@@ -151,7 +151,7 @@ struct StatusBarView: View {
                 coordinator.isAgentPanelVisible.toggle()
             } label: {
                 Image(systemName: "sparkle")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(coordinator.isAgentPanelVisible ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
@@ -166,9 +166,9 @@ struct StatusBarView: View {
                     if let branch = coordinator.branchNames[agent.folderPath] {
                         HStack(spacing: 3) {
                             Image(systemName: "arrow.triangle.branch")
-                                .font(.system(size: 10))
+                                .scaledFont(size: 10)
                             Text(branch)
-                                .font(.system(size: 11))
+                                .scaledFont(size: 11)
                         }
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -176,7 +176,7 @@ struct StatusBarView: View {
 
                     if let sessionId = agent.sessionId {
                         Text(verbatim: sessionId)
-                            .font(.system(size: 10, design: .monospaced))
+                            .scaledFont(size: 10, design: .monospaced)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -205,7 +205,7 @@ struct StatusBarView: View {
             coordinator.activeSidebarPanel = coordinator.activeSidebarPanel == panel ? nil : panel
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .frame(width: 24, height: 20)
                 .foregroundStyle(coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary)
         }
@@ -229,12 +229,12 @@ struct StatusBarView: View {
     private func popoverList(title: String, items: [String], emptyMessage: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
             Divider()
             if items.isEmpty {
                 Text(emptyMessage)
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(items, id: \.self) { item in
@@ -256,7 +256,7 @@ private struct PopoverRow: View {
                 .fill(.green)
                 .frame(width: 6, height: 6)
             Text(label)
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .hoverHighlight()

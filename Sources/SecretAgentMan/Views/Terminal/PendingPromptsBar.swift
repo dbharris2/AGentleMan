@@ -19,14 +19,14 @@ struct PendingPromptsBar: View {
                     VStack(spacing: 0) {
                         HStack(spacing: 8) {
                             Image(systemName: iconForSource(prompt.source))
-                                .font(.system(size: 12))
+                                .scaledFont(size: 12)
                                 .foregroundStyle(colorForSource(prompt.source))
 
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(prompt.source.rawValue)
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .scaledFont(size: 11, weight: .semibold)
                                 Text(prompt.summary)
-                                    .font(.system(size: 11))
+                                    .scaledFont(size: 11)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
@@ -41,7 +41,7 @@ struct PendingPromptsBar: View {
                                 }
                             } label: {
                                 Image(systemName: expandedPromptId == prompt.id ? "chevron.up" : "chevron.down")
-                                    .font(.system(size: 10))
+                                    .scaledFont(size: 10)
                             }
                             .buttonStyle(.plain)
                             .help("Preview prompt")
@@ -51,7 +51,7 @@ struct PendingPromptsBar: View {
                                 store.removePendingPrompt(id: prompt.id)
                             } label: {
                                 Text("Send")
-                                    .font(.system(size: 11, weight: .medium))
+                                    .scaledFont(size: 11, weight: .medium)
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.small)
@@ -60,7 +60,7 @@ struct PendingPromptsBar: View {
                                 store.removePendingPrompt(id: prompt.id)
                             } label: {
                                 Image(systemName: "xmark")
-                                    .font(.system(size: 10))
+                                    .scaledFont(size: 10)
                                     .foregroundStyle(.secondary)
                             }
                             .buttonStyle(.plain)
@@ -72,7 +72,7 @@ struct PendingPromptsBar: View {
                         if expandedPromptId == prompt.id {
                             ScrollView {
                                 Text(prompt.fullPrompt)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .scaledFont(size: 11, design: .monospaced)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(8)
                             }

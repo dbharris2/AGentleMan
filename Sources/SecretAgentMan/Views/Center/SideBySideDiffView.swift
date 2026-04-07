@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SideBySideDiffView: View {
     let diffText: String
+    @Environment(\.fontScale) private var fontScale
     @AppStorage(UserDefaultsKeys.terminalTheme) private var themeName = "Catppuccin Mocha"
 
     private var theme: GhosttyTheme? {
@@ -22,7 +23,7 @@ struct SideBySideDiffView: View {
                     switch row {
                     case let .fileHeader(text):
                         Text(text)
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 12, weight: .bold, design: .monospaced)
                             .foregroundStyle(Color(nsColor: fg ?? .white))
                             .padding(.horizontal, 8)
                             .padding(.top, 12)
@@ -32,7 +33,7 @@ struct SideBySideDiffView: View {
 
                     case let .hunkHeader(text):
                         Text(text)
-                            .font(.system(size: 12, design: .monospaced))
+                            .scaledFont(size: 12, design: .monospaced)
                             .foregroundStyle(Color(nsColor: .systemCyan))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
@@ -73,17 +74,17 @@ struct SideBySideDiffView: View {
 
         if cell.kind == .empty {
             Text(" ")
-                .font(.system(size: 12, design: .monospaced))
+                .scaledFont(size: 12, design: .monospaced)
                 .padding(.horizontal, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        } else if let highlighted = SyntaxHighlighter.highlight(cell.text, language: lang) {
+        } else if let highlighted = SyntaxHighlighter.highlight(cell.text, language: lang, fontSize: 12 * fontScale) {
             Text(highlighted)
                 .padding(.horizontal, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(bgColor)
         } else {
             Text(cell.text.isEmpty ? " " : cell.text)
-                .font(.system(size: 12, design: .monospaced))
+                .scaledFont(size: 12, design: .monospaced)
                 .foregroundStyle(fallbackColor)
                 .padding(.horizontal, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -11,7 +11,7 @@ struct PRMetadataView: View {
             Link(destination: prInfo.url) {
                 Text(verbatim: "#\(prInfo.number)")
             }
-            .font(.system(size: 11))
+            .scaledFont(size: 11)
             .foregroundStyle(.blue)
         }
     }

@@ -24,7 +24,7 @@ struct ContentView: View {
                                 VStack(spacing: 8) {
                                     ProgressView()
                                     Text("Loading diff for #\(pr.number)...")
-                                        .font(.system(size: 13))
+                                        .scaledFont(size: 13)
                                         .foregroundStyle(.secondary)
                                 }
                             } else {

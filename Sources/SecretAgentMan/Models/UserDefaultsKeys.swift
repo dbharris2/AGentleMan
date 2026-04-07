@@ -8,4 +8,5 @@ enum UserDefaultsKeys {
     static let defaultAgentFolder = "defaultAgentFolder"
     static let autoFixCIFailures = "autoFixCIFailures"
     static let autoAnalyzeReviews = "autoAnalyzeReviews"
+    static let fontScale = "fontScale"
 }
