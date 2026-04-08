@@ -6,7 +6,7 @@ struct PRMetadataView: View {
     var body: some View {
         HStack(spacing: 4) {
             RoundedRectangle(cornerRadius: 1)
-                .fill(prInfo.state.color)
+                .fill(prInfo.state.tone.color)
                 .frame(width: 3, height: 14)
             Link(destination: prInfo.url) {
                 Text(verbatim: "#\(prInfo.number)")

@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 enum PRState: Equatable {
     case draft
@@ -7,17 +7,6 @@ enum PRState: Equatable {
     case approved
     case inMergeQueue
     case merged
-
-    var color: Color {
-        switch self {
-        case .draft: .secondary
-        case .changesRequested: .red
-        case .needsReview: .orange
-        case .approved: .green
-        case .inMergeQueue: .yellow
-        case .merged: .purple
-        }
-    }
 }
 
 struct PRInfo: Equatable {
@@ -58,22 +47,4 @@ enum PRCheckStatus: Equatable {
     case fail
     case pending
     case none
-
-    var color: Color {
-        switch self {
-        case .pass: .green
-        case .fail: .red
-        case .pending: .orange
-        case .none: .secondary
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .pass: "Checks passed"
-        case .fail: "Checks failed"
-        case .pending: "Checks running"
-        case .none: "No checks"
-        }
-    }
 }

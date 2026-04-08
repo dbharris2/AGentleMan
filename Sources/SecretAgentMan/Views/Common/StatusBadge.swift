@@ -4,9 +4,11 @@ struct StatusBadge: View {
     let state: AgentState
 
     var body: some View {
-        Image(systemName: state.systemImage)
-            .foregroundStyle(state.color)
+        let presentation = state.presentation
+
+        Image(systemName: presentation.systemImage)
+            .foregroundStyle(presentation.tone.color)
             .scaledFont(size: 10)
-            .help(state.label)
+            .help(presentation.label)
     }
 }
