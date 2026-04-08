@@ -175,9 +175,11 @@ final class PRStore {
         var result: [String: MatchedPR?] = [:]
         for folder in folders {
             let key = Self.folderKey(folder)
-            guard let repo = repoNames[key],
-                  let bookmark = repositoryMonitor.bookmark(for: folder)
-            else { continue }
+            guard let repo = repoNames[key] else { continue }
+            guard let bookmark = repositoryMonitor.bookmark(for: folder) else {
+                result[key] = nil
+                continue
+            }
 
             if let pr = prByRepoBranch["\(repo)/\(bookmark)"] {
                 result[key] = MatchedPR(folder: folder, pr: pr, info: GitHubPRService.prInfo(from: pr))
