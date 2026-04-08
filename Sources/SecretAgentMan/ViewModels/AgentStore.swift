@@ -13,6 +13,10 @@ final class AgentStore {
     var selectedAgentId: UUID?
     var pendingPrompts: [PendingPrompt] = []
 
+    /// Bumped when a terminal session is restarted so panel views can re-sync
+    /// without needing to observe `agents` (which would cause an AttributeGraph cycle).
+    var terminalRestartCount = 0
+
     func addPendingPrompt(_ prompt: PendingPrompt) {
         guard !pendingPrompts.contains(where: { $0.agentId == prompt.agentId && $0.source == prompt.source }) else { return }
         pendingPrompts.append(prompt)
