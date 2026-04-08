@@ -11,9 +11,15 @@ struct SidebarView: View {
         coordinator.store.agents.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    private var selectionBinding: Binding<UUID?> {
+        Binding(
+            get: { coordinator.store.selectedAgentId },
+            set: { coordinator.store.selectAgent(id: $0) }
+        )
+    }
+
     var body: some View {
-        @Bindable var store = coordinator.store
-        List(selection: $store.selectedAgentId) {
+        List(selection: selectionBinding) {
             ForEach(sortedAgents) { agent in
                 AgentRowView(
                     agent: agent,

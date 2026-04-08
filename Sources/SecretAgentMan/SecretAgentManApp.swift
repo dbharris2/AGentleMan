@@ -72,7 +72,7 @@ struct SecretAgentManApp: App {
                 let orderedAgents = coordinator.store.agentsByFolder.flatMap(\.agents)
                 ForEach(Array(orderedAgents.prefix(9).enumerated()), id: \.element.id) { index, agent in
                     Button(agent.name) {
-                        coordinator.store.selectedAgentId = agent.id
+                        coordinator.store.selectAgent(id: agent.id)
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
                 }
