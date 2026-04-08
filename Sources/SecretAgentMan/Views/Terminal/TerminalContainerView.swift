@@ -4,18 +4,15 @@ import SwiftUI
 /// A reusable NSViewRepresentable container that swaps terminal views when
 /// the selected agent changes. Used by both the agent terminal and shell panels.
 ///
-/// IMPORTANT: This view intentionally takes a pre-resolved `terminal` instead
-/// of a closure or store reference. Reading @Observable properties inside
-/// `updateNSView` establishes observation that, combined with closure parameters
-/// SwiftUI can't compare, causes cascading re-render loops when multiple
-/// containers exist (e.g. agent + shell panels both visible).
+/// IMPORTANT: This view takes a pre-resolved `terminal` and `selectedAgentId`
+/// from @State in the parent view. Do NOT read @Observable properties (like
+/// `store.agents`) in body or updateNSView — doing so creates an AttributeGraph
+/// cycle when combined with non-comparable reference-type parameters.
 struct TerminalContainerView: NSViewRepresentable {
-    var label: String = "unknown"
     let selectedAgentId: UUID?
     let terminal: LocalProcessTerminalView?
 
     func makeNSView(context: Context) -> NSView {
-        context.coordinator.label = label
         let container = NSView(frame: .zero)
         if let terminal {
             Self.embed(terminal, in: container)
@@ -71,6 +68,5 @@ struct TerminalContainerView: NSViewRepresentable {
     final class Coordinator {
         var currentAgentId: UUID?
         weak var currentTerminal: LocalProcessTerminalView?
-        var label: String = "unknown"
     }
 }

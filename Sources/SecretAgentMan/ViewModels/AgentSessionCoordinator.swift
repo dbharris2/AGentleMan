@@ -52,6 +52,7 @@ final class AgentSessionCoordinator {
                     self.store.updateState(id: agentId, state: state)
                 }
             }
+            store.terminalRestartCount += 1
         }
 
         sessionWatcher.onDirectoryChanged = { [self] _ in
