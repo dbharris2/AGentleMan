@@ -3,19 +3,23 @@ import SwiftUI
 
 /// A reusable NSViewRepresentable container that swaps terminal views when
 /// the selected agent changes. Used by both the agent terminal and shell panels.
+///
+/// IMPORTANT: This view intentionally takes a pre-resolved `terminal` instead
+/// of a closure or store reference. Reading @Observable properties inside
+/// `updateNSView` establishes observation that, combined with closure parameters
+/// SwiftUI can't compare, causes cascading re-render loops when multiple
+/// containers exist (e.g. agent + shell panels both visible).
 struct TerminalContainerView: NSViewRepresentable {
     var label: String = "unknown"
     let selectedAgentId: UUID?
-    let store: AgentStore
-    let terminalProvider: (Agent) -> LocalProcessTerminalView
+    let terminal: LocalProcessTerminalView?
 
     func makeNSView(context: Context) -> NSView {
         context.coordinator.label = label
         let container = NSView(frame: .zero)
-        if let agentId = selectedAgentId, let agent = store.agents.first(where: { $0.id == agentId }) {
-            let terminal = terminalProvider(agent)
+        if let terminal {
             Self.embed(terminal, in: container)
-            context.coordinator.currentAgentId = agentId
+            context.coordinator.currentAgentId = selectedAgentId
             context.coordinator.currentTerminal = terminal
         }
         return container
@@ -25,8 +29,8 @@ struct TerminalContainerView: NSViewRepresentable {
         let newId = selectedAgentId
         let oldId = context.coordinator.currentAgentId
 
-        guard let agentId = newId, let agent = store.agents.first(where: { $0.id == agentId }) else {
-            if newId != oldId {
+        guard let terminal else {
+            if newId != oldId || context.coordinator.currentTerminal != nil {
                 for subview in container.subviews {
                     subview.removeFromSuperview()
                 }
@@ -35,8 +39,6 @@ struct TerminalContainerView: NSViewRepresentable {
             }
             return
         }
-
-        let terminal = terminalProvider(agent)
 
         // Re-embed if agent changed or terminal instance changed (e.g. session restart)
         guard newId != oldId || terminal !== context.coordinator.currentTerminal else { return }
