@@ -48,8 +48,8 @@ struct StatusBarView: View {
         let sessions = sessions
 
         HStack(spacing: 8) {
-            // Left: navigation icons
-            HStack(spacing: 2) {
+            // Left: navigation toggles
+            HStack(spacing: 8) {
                 panelToggleButton(icon: "doc.text", panel: .plans, label: "Plans")
                 panelToggleImageButton(image: "PRIcon", panel: .prs, label: "Pull Requests")
             }
@@ -59,9 +59,7 @@ struct StatusBarView: View {
 
             // Center-left: per-agent context
             HStack(spacing: 10) {
-                Button {
-                    showingMCPPopover.toggle()
-                } label: {
+                popoverButton(isPresented: $showingMCPPopover, help: "MCP Servers") {
                     HStack(spacing: 3) {
                         Image(systemName: "server.rack")
                             .scaledFont(size: 10)
@@ -70,8 +68,6 @@ struct StatusBarView: View {
                     }
                     .foregroundStyle(mcpServers.isEmpty ? .secondary : .primary)
                 }
-                .buttonStyle(.plain)
-                .help("MCP Servers")
                 .popover(isPresented: $showingMCPPopover) {
                     popoverList(
                         title: "MCP Servers",
@@ -80,9 +76,7 @@ struct StatusBarView: View {
                     )
                 }
 
-                Button {
-                    showingPluginsPopover.toggle()
-                } label: {
+                popoverButton(isPresented: $showingPluginsPopover, help: "Plugins") {
                     HStack(spacing: 3) {
                         Image(systemName: "puzzlepiece.extension")
                             .scaledFont(size: 10)
@@ -91,8 +85,6 @@ struct StatusBarView: View {
                     }
                     .foregroundStyle(plugins.isEmpty ? .secondary : .primary)
                 }
-                .buttonStyle(.plain)
-                .help("Plugins")
                 .popover(isPresented: $showingPluginsPopover) {
                     popoverList(
                         title: "Plugins",
@@ -101,9 +93,7 @@ struct StatusBarView: View {
                     )
                 }
 
-                Button {
-                    showingSkillsPopover.toggle()
-                } label: {
+                popoverButton(isPresented: $showingSkillsPopover, help: "Skills") {
                     HStack(spacing: 3) {
                         Image(systemName: "sparkles")
                             .scaledFont(size: 10)
@@ -112,8 +102,6 @@ struct StatusBarView: View {
                     }
                     .foregroundStyle(skills.isEmpty ? .secondary : .primary)
                 }
-                .buttonStyle(.plain)
-                .help("Skills")
                 .popover(isPresented: $showingSkillsPopover) {
                     SkillsPopover(skills: skills) { skill in
                         showingSkillsPopover = false
@@ -121,9 +109,7 @@ struct StatusBarView: View {
                     }
                 }
 
-                Button {
-                    showingScriptsPopover.toggle()
-                } label: {
+                popoverButton(isPresented: $showingScriptsPopover, help: "Project Scripts") {
                     HStack(spacing: 3) {
                         Image(systemName: "play.rectangle")
                             .scaledFont(size: 10)
@@ -132,8 +118,6 @@ struct StatusBarView: View {
                     }
                     .foregroundStyle(scripts.isEmpty ? .secondary : .primary)
                 }
-                .buttonStyle(.plain)
-                .help("Project Scripts")
                 .popover(isPresented: $showingScriptsPopover) {
                     ScriptRunnerPopover(scripts: scripts) { script in
                         showingScriptsPopover = false
@@ -154,6 +138,7 @@ struct StatusBarView: View {
             }
             .buttonStyle(.plain)
             .help("Toggle Terminal (Cmd+J)")
+            .statusBarPill(isSelected: isShellPanelVisible)
 
             Button {
                 coordinator.isAgentPanelVisible.toggle()
@@ -166,6 +151,7 @@ struct StatusBarView: View {
             }
             .buttonStyle(.plain)
             .help("Toggle Agent Panel")
+            .statusBarPill(isSelected: coordinator.isAgentPanelVisible)
 
             Divider()
                 .frame(height: 16)
@@ -173,12 +159,6 @@ struct StatusBarView: View {
 
             if let agent = selectedAgent {
                 HStack(spacing: 8) {
-                    HStack(spacing: 4) {
-                        Text(agent.provider.displayName)
-                            .scaledFont(size: 11)
-                            .foregroundStyle(.secondary)
-                    }
-
                     if let branch = coordinator.repositoryMonitor.branchNames[agent.folderPath] {
                         HStack(spacing: 3) {
                             Image(systemName: "arrow.triangle.branch")
@@ -191,15 +171,15 @@ struct StatusBarView: View {
                     }
 
                     if let sessionId = agent.sessionId {
-                        Button {
-                            showingSessionPopover.toggle()
-                        } label: {
-                            Text(verbatim: sessionId)
-                                .scaledFont(size: 10, design: .monospaced)
-                                .foregroundStyle(.secondary)
+                        popoverButton(isPresented: $showingSessionPopover, help: "Sessions") {
+                            HStack(spacing: 4) {
+                                providerIcon(for: agent.provider)
+
+                                Text(verbatim: sessionId)
+                                    .scaledFont(size: 10, design: .monospaced)
+                            }
+                            .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .help("Sessions")
                         .popover(isPresented: $showingSessionPopover) {
                             SessionPopover(
                                 agent: agent,
@@ -246,15 +226,18 @@ struct StatusBarView: View {
         Button {
             coordinator.activeSidebarPanel = coordinator.activeSidebarPanel == panel ? nil : panel
         } label: {
-            Image(systemName: icon)
-                .scaledFont(size: 11)
-                .frame(width: 24, height: 20)
-                .foregroundStyle(
-                    coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary
-                )
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .scaledFont(size: 11)
+                Text(label)
+                    .scaledFont(size: 11)
+            }
+            .frame(height: 20)
+            .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
         .help(label)
+        .statusBarPill(isSelected: coordinator.activeSidebarPanel == panel)
     }
 
     private func panelToggleImageButton(image: String, panel: SidebarPanel, label: String)
@@ -262,15 +245,34 @@ struct StatusBarView: View {
         Button {
             coordinator.activeSidebarPanel = coordinator.activeSidebarPanel == panel ? nil : panel
         } label: {
-            Image(image)
-                .resizable()
-                .frame(width: 12, height: 12)
-                .foregroundStyle(
-                    coordinator.activeSidebarPanel == panel ? Color.accentColor : .secondary
-                )
+            HStack(spacing: 4) {
+                Image(image)
+                    .resizable()
+                    .frame(width: 12, height: 12)
+                Text(label)
+                    .scaledFont(size: 11)
+            }
+            .frame(height: 20)
+            .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
         .help(label)
+        .statusBarPill(isSelected: coordinator.activeSidebarPanel == panel)
+    }
+
+    private func popoverButton(
+        isPresented: Binding<Bool>,
+        help: String,
+        @ViewBuilder label: () -> some View
+    ) -> some View {
+        Button {
+            isPresented.wrappedValue.toggle()
+        } label: {
+            label()
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .statusBarPill(isSelected: isPresented.wrappedValue)
     }
 
     private func popoverList(title: String, items: [String], emptyMessage: String) -> some View {
@@ -291,6 +293,29 @@ struct StatusBarView: View {
         }
         .padding(10)
         .frame(minWidth: 180)
+    }
+
+    @ViewBuilder
+    private func providerIcon(for provider: AgentProvider) -> some View {
+        switch provider {
+        case .claude:
+            Image("ClaudeIcon")
+                .resizable()
+                .frame(width: 12, height: 12)
+        case .codex:
+            Image("CodexIcon")
+                .resizable()
+                .frame(width: 12, height: 12)
+        }
+    }
+}
+
+private extension View {
+    func statusBarPill(isSelected: Bool) -> some View {
+        self
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .hoverHighlight(isSelected: isSelected)
     }
 }
 
