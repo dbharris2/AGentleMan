@@ -64,6 +64,8 @@ final class PRStore {
                 }
             }
 
+            clearPRInfosForFoldersWithoutBookmarks(folders)
+
             let prSections = await githubPRService.fetchAllPRs()
             githubPRSections = prSections
             lastPRPollTime = Date()
@@ -216,6 +218,15 @@ final class PRStore {
                 prInfos[key] = merged
                 detectPRTransitions(folder: matched.folder, old: oldInfo, new: merged, pr: matched.pr)
             }
+        }
+    }
+
+    private func clearPRInfosForFoldersWithoutBookmarks(_ folders: Set<URL>) {
+        for folder in folders {
+            let key = Self.folderKey(folder)
+            guard repoNames[key] != nil else { continue }
+            guard repositoryMonitor.bookmark(for: folder) == nil else { continue }
+            prInfos.removeValue(forKey: key)
         }
     }
 
