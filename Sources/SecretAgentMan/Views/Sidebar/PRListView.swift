@@ -299,10 +299,11 @@ struct PRRowView: View {
                     }
 
                     if pr.checkStatus != .none {
+                        let presentation = pr.checkStatus.presentation
                         Image(systemName: "flask.fill")
                             .scaledFont(size: 11)
-                            .foregroundStyle(pr.checkStatus.color)
-                            .help(pr.checkStatus.label)
+                            .foregroundStyle(presentation.tone.color)
+                            .help(presentation.label)
                     }
                 }
             }
