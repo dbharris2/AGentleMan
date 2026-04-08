@@ -106,4 +106,55 @@ struct SessionFileDetectorTests {
         let missing = URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString)")
         #expect(!SessionFileDetector.sessionFileExists("abc-123", inDirectory: missing))
     }
+
+    @Test
+    func parseCodexSessionMetaLineExtractsIdAndFolder() {
+        let line = #"{"timestamp":"2026-04-07T19:31:38.168Z","type":"session_meta","payload":{"id":"codex-session","cwd":"/tmp/project"}}"#
+
+        let meta = SessionFileDetector.parseCodexSessionMetaLine(line)
+
+        #expect(meta?.id == "codex-session")
+        #expect(meta?.cwd == "/tmp/project")
+    }
+
+    @Test
+    func latestCodexSessionIdReturnsNewestMatchingFolder() throws {
+        let rootDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let dayDir = rootDir.appendingPathComponent("2026/04/07", isDirectory: true)
+        try FileManager.default.createDirectory(at: dayDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootDir) }
+
+        let folder = URL(fileURLWithPath: "/tmp/project-a")
+        let old = dayDir.appendingPathComponent("old.jsonl")
+        let new = dayDir.appendingPathComponent("new.jsonl")
+        let other = dayDir.appendingPathComponent("other.jsonl")
+
+        try #"{"type":"session_meta","payload":{"id":"old-session","cwd":"/tmp/project-a"}}"#
+            .write(to: old, atomically: true, encoding: .utf8)
+        Thread.sleep(forTimeInterval: 0.1)
+        try #"{"type":"session_meta","payload":{"id":"new-session","cwd":"/tmp/project-a"}}"#
+            .write(to: new, atomically: true, encoding: .utf8)
+        try #"{"type":"session_meta","payload":{"id":"other-session","cwd":"/tmp/project-b"}}"#
+            .write(to: other, atomically: true, encoding: .utf8)
+
+        let result = SessionFileDetector.latestCodexSessionId(for: folder, inDirectory: rootDir)
+        #expect(result == "new-session")
+    }
+
+    @Test
+    func codexSessionFileExistsMatchesSessionIdInSessionMeta() throws {
+        let rootDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let dayDir = rootDir.appendingPathComponent("2026/04/07", isDirectory: true)
+        try FileManager.default.createDirectory(at: dayDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootDir) }
+
+        let file = dayDir.appendingPathComponent("session.jsonl")
+        try #"{"type":"session_meta","payload":{"id":"codex-session","cwd":"/tmp/project"}}"#
+            .write(to: file, atomically: true, encoding: .utf8)
+
+        #expect(SessionFileDetector.codexSessionFileExists("codex-session", inDirectory: rootDir))
+        #expect(!SessionFileDetector.codexSessionFileExists("other-session", inDirectory: rootDir))
+    }
 }

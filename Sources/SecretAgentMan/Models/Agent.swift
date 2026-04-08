@@ -4,6 +4,7 @@ struct Agent: Identifiable, Hashable, Codable {
     let id: UUID
     var name: String
     var folder: URL
+    var provider: AgentProvider
     var state: AgentState
     var sessionId: String?
     var initialPrompt: String?
@@ -22,6 +23,7 @@ struct Agent: Identifiable, Hashable, Codable {
         id: UUID = UUID(),
         name: String,
         folder: URL,
+        provider: AgentProvider = .claude,
         state: AgentState = .idle,
         sessionId: String? = nil,
         initialPrompt: String? = nil,
@@ -31,6 +33,7 @@ struct Agent: Identifiable, Hashable, Codable {
         self.id = id
         self.name = name
         self.folder = folder
+        self.provider = provider
         self.state = state
         self.sessionId = sessionId
         self.initialPrompt = initialPrompt
@@ -43,6 +46,7 @@ struct Agent: Identifiable, Hashable, Codable {
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         folder = try container.decode(URL.self, forKey: .folder)
+        provider = try container.decodeIfPresent(AgentProvider.self, forKey: .provider) ?? .claude
         state = try container.decode(AgentState.self, forKey: .state)
         sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
         initialPrompt = try container.decodeIfPresent(String.self, forKey: .initialPrompt)

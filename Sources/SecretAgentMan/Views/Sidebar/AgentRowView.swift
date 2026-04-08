@@ -9,14 +9,14 @@ struct AgentRowView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image("ClaudeIcon")
-                .resizable()
-                .frame(width: 24, height: 24)
+            AgentProviderIconView(provider: agent.provider)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(agent.name)
-                    .scaledFont(size: 13, weight: isSelected ? .semibold : .regular)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(agent.name)
+                        .scaledFont(size: 13, weight: isSelected ? .semibold : .regular)
+                        .lineLimit(1)
+                }
 
                 if let branch = branchName {
                     BranchInfoView(branchName: branch)

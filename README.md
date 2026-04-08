@@ -1,27 +1,28 @@
 # Secret Agent Man
 
-A macOS app for managing multiple Claude Code agent sessions with a Slack-like interface.
+A macOS app for managing Claude Code and Codex agent sessions with a Slack-like interface.
 
 ## Features
 
 - **Multi-agent management** — create, switch, rename, and remove agents across different project folders
-- **Embedded terminal** — full interactive Claude Code TUI via SwiftTerm
-- **Split shell** — a second terminal below Claude for running git/jj commands in the agent's directory
+- **Provider selection** — choose Claude or Codex per agent
+- **Embedded terminal** — full interactive Claude Code or Codex CLI session via SwiftTerm
+- **Split shell** — a second terminal below the agent session for running git/jj commands in the agent's directory
 - **Colored diff view** — unified and side-by-side diff views with per-file filtering
 - **PR status tracking** — live CI check status, additions/deletions, reviewer avatars, and PR state per folder via `gh` CLI
 - **Ghostty theme support** — 460+ terminal themes bundled with the app (no Ghostty installation required)
-- **Plans panel** — browse and read Claude Code plans with full markdown rendering
+- **Plans panel** — browse and read Claude Code plans, with Codex-aware fallback messaging
 - **VCS integration** — shows jj commit descriptions or git branch names per folder
-- **Session persistence** — agents and sessions survive app restarts via `claude --resume`, with automatic recovery from stale sessions
-- **Auto mode** — all Claude sessions launch with `--enable-auto-mode`
+- **Session persistence** — agents and sessions survive app restarts with provider-specific resume/recovery behavior
+- **Auto mode** — Claude launches with `--enable-auto-mode`; Codex launches with `--full-auto`
 - **Collapsible folders** — sidebar folder sections collapse to hide agents, with open/closed folder icons
 - **Keyboard shortcuts** — Cmd+1-9 to switch agents, Cmd+N for new agent
-- **Plugin support** — configurable `--plugin-dir` passed to all Claude sessions
+- **Provider-aware metadata** — skills/plugins/settings adapt to the selected provider
 
 ## Requirements
 
 - macOS 14.0+
-- [Claude Code](https://claude.ai/download) CLI installed
+- [Claude Code](https://claude.ai/download) CLI and/or Codex CLI installed
 - [`gh` CLI](https://cli.github.com) (optional, for PR status tracking)
 
 ## Setup
@@ -68,15 +69,15 @@ Sources/SecretAgentMan/
   Views/
     Sidebar/                       — Activity bar, agent list, plan list
     Center/                        — Diff views, plan detail, changes
-    Terminal/                      — Claude terminal, shell terminal
+    Terminal/                      — Agent terminal, shell terminal
     Common/                        — Persistent split view, status badge
 ```
 
 ## Data Storage
 
 - **Agent config** — `~/Library/Application Support/SecretAgentMan/agents.json`
-- **Settings** — UserDefaults (theme, plugin directory, selected agent, split positions)
-- **Sessions** — Claude Code sessions stored by Claude in `~/.claude/projects/`
+- **Settings** — UserDefaults (theme, Claude plugin directory, selected agent, split positions)
+- **Sessions** — Claude sessions in `~/.claude/projects/`, Codex sessions in `~/.codex/sessions/`
 
 ## License
 

@@ -1,54 +1,69 @@
 import SwiftUI
 
 struct PlanListView: View {
+    @Environment(AppCoordinator.self) private var coordinator
     @Binding var selectedPlanURL: URL?
     @State private var plans: [PlanFile] = []
 
-    private static let plansDir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".claude/plans")
-
     var body: some View {
-        List(plans, selection: $selectedPlanURL) { plan in
-            VStack(alignment: .leading, spacing: 2) {
-                Text(plan.title)
-                    .scaledFont(size: 13)
-                    .lineLimit(1)
+        Group {
+            if coordinator.store.selectedAgent?.provider == .codex {
+                ContentUnavailableView(
+                    "Plans Unavailable",
+                    systemImage: "clock.arrow.circlepath",
+                    description: Text("Codex does not write Claude-style plan files. Use the session terminal and status panels for Codex agents.")
+                )
+            } else {
+                List(plans, selection: $selectedPlanURL) { plan in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(plan.title)
+                            .scaledFont(size: 13)
+                            .lineLimit(1)
 
-                Text(plan.filename)
-                    .scaledFont(size: 11)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 6)
-            .padding(.bottom, 4)
-            .contentShape(Rectangle())
-            .hoverHighlight()
-            .tag(plan.url)
-            .contextMenu {
-                Button("Delete", role: .destructive) {
-                    deletePlan(plan)
+                        Text(plan.filename)
+                            .scaledFont(size: 11)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 6)
+                    .padding(.bottom, 4)
+                    .contentShape(Rectangle())
+                    .hoverHighlight()
+                    .tag(plan.url)
+                    .contextMenu {
+                        Button("Delete", role: .destructive) {
+                            deletePlan(plan)
+                        }
+                    }
                 }
-            }
-        }
-        .listStyle(.sidebar)
-        .onAppear { loadPlans() }
-        .toolbar {
-            ToolbarItem {
-                Button {
+                .listStyle(.sidebar)
+                .onAppear { loadPlans() }
+                .onChange(of: coordinator.store.selectedAgent?.provider) {
                     loadPlans()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
                 }
-                .help("Refresh plans")
+                .toolbar {
+                    ToolbarItem {
+                        Button {
+                            loadPlans()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .help("Refresh plans")
+                    }
+                }
             }
         }
     }
 
     private func loadPlans() {
         let fm = FileManager.default
+        guard let plansDir else {
+            plans = []
+            return
+        }
         guard let files = try? fm.contentsOfDirectory(
-            at: Self.plansDir,
+            at: plansDir,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
@@ -67,6 +82,17 @@ struct PlanListView: View {
                 return PlanFile(url: url, title: title, filename: url.lastPathComponent, modified: modified)
             }
             .sorted { ($0.modified ?? .distantPast) > ($1.modified ?? .distantPast) }
+    }
+
+    private var plansDir: URL? {
+        switch coordinator.store.selectedAgent?.provider {
+        case .claude:
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/plans")
+        case .codex:
+            nil
+        case nil:
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/plans")
+        }
     }
 
     private func deletePlan(_ plan: PlanFile) {
