@@ -125,7 +125,7 @@ final class PRStore {
             folder: folder,
             provider: .claude
         )
-        store.selectedAgentId = previousSelection
+        store.selectAgent(id: previousSelection)
 
         let prompt = """
         Review PR #\(pr.number) at \(pr.url.absoluteString)

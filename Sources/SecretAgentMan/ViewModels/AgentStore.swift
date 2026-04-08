@@ -25,17 +25,25 @@ final class AgentStore {
         pendingPrompts.removeAll { $0.agentId == agentId && $0.source == source }
     }
 
-    private static let saveURL: URL = {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    static func persistenceURL(appSupportRoot: URL? = nil) -> URL {
+        let dir = (appSupportRoot ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
             .appendingPathComponent("SecretAgentMan", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("agents.json")
-    }()
+    }
 
     private let persistsToFile: Bool
+    private let userDefaults: UserDefaults
+    private let saveURL: URL
 
-    init(loadFromDisk: Bool = true) {
+    init(
+        loadFromDisk: Bool = true,
+        userDefaults: UserDefaults = .standard,
+        saveURL: URL = AgentStore.persistenceURL()
+    ) {
         self.persistsToFile = loadFromDisk
+        self.userDefaults = userDefaults
+        self.saveURL = saveURL
         if loadFromDisk {
             load()
         }
@@ -43,6 +51,12 @@ final class AgentStore {
 
     var selectedAgent: Agent? {
         agents.first { $0.id == selectedAgentId }
+    }
+
+    func selectAgent(id: UUID?) {
+        guard selectedAgentId != id else { return }
+        selectedAgentId = id
+        persistSelectedAgentId()
     }
 
     var agentsByFolder: [(folder: String, agents: [Agent])] {
@@ -66,7 +80,7 @@ final class AgentStore {
             initialPrompt: initialPrompt
         )
         agents.append(agent)
-        selectedAgentId = agent.id
+        selectAgent(id: agent.id)
         save()
         return agent
     }
@@ -74,7 +88,7 @@ final class AgentStore {
     func removeAgent(id: UUID) {
         agents.removeAll { $0.id == id }
         if selectedAgentId == id {
-            selectedAgentId = agents.first?.id
+            selectAgent(id: agents.first?.id)
         }
         save()
     }
@@ -124,14 +138,14 @@ final class AgentStore {
         guard persistsToFile else { return }
         do {
             let data = try JSONEncoder().encode(agents)
-            try data.write(to: Self.saveURL, options: .atomic)
+            try data.write(to: saveURL, options: .atomic)
         } catch {
             print("Failed to save agents: \(error)")
         }
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: Self.saveURL),
+        guard let data = try? Data(contentsOf: saveURL),
               var loaded = try? JSONDecoder().decode([Agent].self, from: data)
         else { return }
 
@@ -148,16 +162,25 @@ final class AgentStore {
         }
 
         agents = loaded
-        if let saved = UserDefaults.standard.string(forKey: "selectedAgentId"),
+        if let saved = userDefaults.string(forKey: UserDefaultsKeys.selectedAgentId),
            let savedId = UUID(uuidString: saved),
            agents.contains(where: { $0.id == savedId }) {
-            selectedAgentId = savedId
+            selectAgent(id: savedId)
         } else {
-            selectedAgentId = agents.first?.id
+            selectAgent(id: agents.first?.id)
         }
 
         if needsSave {
             save()
+        }
+    }
+
+    private func persistSelectedAgentId() {
+        guard persistsToFile else { return }
+        if let selectedAgentId {
+            userDefaults.set(selectedAgentId.uuidString, forKey: UserDefaultsKeys.selectedAgentId)
+        } else {
+            userDefaults.removeObject(forKey: UserDefaultsKeys.selectedAgentId)
         }
     }
 }
