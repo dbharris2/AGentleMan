@@ -39,16 +39,10 @@ final class ClaudeStreamMonitor {
         let argumentHint: String
     }
 
-    struct RateLimitInfo: Equatable {
-        let usedPercent: Double
-        let resetsAt: Date?
-    }
-
     private(set) var slashCommands: [SlashCommand] = []
     private(set) var modelNames: [UUID: String] = [:]
     private(set) var contextPercentUsed: [UUID: Double] = [:]
     private(set) var permissionModes: [UUID: String] = [:]
-    private(set) var rateLimits: [UUID: RateLimitInfo] = [:]
 
     static let permissionModes = ["default", "acceptEdits", "plan", "auto", "bypassPermissions"]
 
@@ -132,14 +126,6 @@ final class ClaudeStreamMonitor {
                             argumentHint: dict["argumentHint"] as? String ?? ""
                         )
                     }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                }
-            },
-            rateLimitReceived: { [weak self] id, usedPercent, resetsAt in
-                Task { @MainActor in
-                    self?.rateLimits[id] = RateLimitInfo(
-                        usedPercent: usedPercent,
-                        resetsAt: resetsAt.map { Date(timeIntervalSince1970: $0) }
-                    )
                 }
             }
         )
@@ -242,7 +228,6 @@ final class ClaudeStreamMonitor {
         modelNames.removeValue(forKey: agentId)
         contextPercentUsed.removeValue(forKey: agentId)
         permissionModes.removeValue(forKey: agentId)
-        rateLimits.removeValue(forKey: agentId)
     }
 
     func interrupt(for agentId: UUID) {
@@ -440,7 +425,6 @@ private struct ObserverDelegate {
     let permissionModeChanged: (UUID, String) -> Void
     let modelInfo: (UUID, String, Double) -> Void
     let slashCommands: ([[String: Any]]) -> Void
-    let rateLimitReceived: (UUID, Double, TimeInterval?) -> Void
 }
 
 private struct PendingApproval {
@@ -714,8 +698,6 @@ private final class Observer: @unchecked Sendable {
             handleControlResponse(object)
         case "result":
             handleResultEvent(object)
-        case "rate_limit_event":
-            handleRateLimitEvent(object)
         default:
             break
         }
@@ -879,30 +861,25 @@ private final class Observer: @unchecked Sendable {
 
     private func handleResultEvent(_ event: [String: Any]) {
         finalizeStreaming()
+
+        // Context window % from the last API call's actual token consumption.
+        // modelUsage is cumulative across the session, so use usage.iterations instead.
         if let modelUsage = event["modelUsage"] as? [String: Any],
            let firstUsage = modelUsage.values.first as? [String: Any],
-           let contextWindow = firstUsage["contextWindow"] as? Double, contextWindow > 0 {
-            // inputTokens includes the full conversation context sent to the API.
-            // cacheRead/cacheCreate are subsets of inputTokens, not additive.
-            let input = firstUsage["inputTokens"] as? Double ?? 0
-            let cacheRead = firstUsage["cacheReadInputTokens"] as? Double ?? 0
-            let cacheCreate = firstUsage["cacheCreationInputTokens"] as? Double ?? 0
-            let totalInput = max(input, cacheRead + cacheCreate)
-            let output = firstUsage["outputTokens"] as? Double ?? 0
-            let pct = (totalInput + output) / contextWindow * 100
+           let contextWindow = firstUsage["contextWindow"] as? Double, contextWindow > 0,
+           let usage = event["usage"] as? [String: Any],
+           let iterations = usage["iterations"] as? [[String: Any]],
+           let lastIter = iterations.last {
+            let input = lastIter["input_tokens"] as? Double ?? 0
+            let cacheRead = lastIter["cache_read_input_tokens"] as? Double ?? 0
+            let cacheCreate = lastIter["cache_creation_input_tokens"] as? Double ?? 0
+            let output = lastIter["output_tokens"] as? Double ?? 0
+            let pct = (input + cacheRead + cacheCreate + output) / contextWindow * 100
             delegate.modelInfo(agent.id, "", pct)
         }
 
         let isError = event["is_error"] as? Bool ?? false
         publishIfChanged(isError ? .error : .awaitingInput)
-    }
-
-    private func handleRateLimitEvent(_ event: [String: Any]) {
-        guard let info = event["rate_limit_info"] as? [String: Any],
-              let utilization = info["utilization"] as? Double
-        else { return }
-        let resetsAt = info["resetsAt"] as? TimeInterval
-        delegate.rateLimitReceived(agent.id, utilization * 100, resetsAt)
     }
 
     // MARK: - Streaming Helpers

@@ -103,7 +103,8 @@ final class UsageMonitor {
 
     // MARK: - Claude Parsing
 
-    /// Rate limits are account-level, so read from the most recently modified agent-status file.
+    /// Rate limits are account-level. Scan agent-status `.json` files newest-first
+    /// until one contains `rate_limits` — only TUI sessions write this field.
     private func readLatestClaudeRateLimits() -> AgentRateLimits? {
         let dir = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".claude/agent-status")
@@ -114,7 +115,7 @@ final class UsageMonitor {
             options: .skipsHiddenFiles
         ) else { return nil }
 
-        let newest = entries
+        let sorted = entries
             .filter { $0.pathExtension == "json" }
             .compactMap { url -> (url: URL, date: Date)? in
                 guard let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))
@@ -122,13 +123,15 @@ final class UsageMonitor {
                 else { return nil }
                 return (url, modified)
             }
-            .max(by: { $0.date < $1.date })
+            .sorted { $0.date > $1.date }
 
-        guard let fileURL = newest?.url,
-              let data = try? Data(contentsOf: fileURL)
-        else { return nil }
-
-        return Self.parseClaudeAgentStatus(data)
+        for entry in sorted {
+            guard let data = try? Data(contentsOf: entry.url),
+                  let limits = Self.parseClaudeAgentStatus(data)
+            else { continue }
+            return limits
+        }
+        return nil
     }
 
     nonisolated static func parseClaudeAgentStatus(_ data: Data) -> AgentRateLimits? {
