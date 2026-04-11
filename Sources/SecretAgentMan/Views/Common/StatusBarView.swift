@@ -228,9 +228,7 @@ struct StatusBarView: View {
     }
 
     private func sendSkill(_ skill: SkillInfo) {
-        guard let agentId = coordinator.store.selectedAgentId else { return }
-        coordinator.terminalManager.typeText(to: agentId, text: "/\(skill.name) ")
-        coordinator.terminalManager.focusTerminal(for: agentId)
+        coordinator.composerInsert = "/\(skill.name) "
     }
 
     private func runScript(_ script: ProjectScript) {
