@@ -53,7 +53,7 @@ struct SkillsPopover: View {
             }
         }
         .padding(10)
-        .frame(minWidth: 240)
+        .frame(minWidth: 240, maxWidth: 360)
     }
 }
 
@@ -77,7 +77,7 @@ private struct SkillRow: View {
                     }
                 }
                 Spacer()
-                Image(systemName: "paperplane.fill")
+                Image(systemName: "text.insert")
                     .scaledFont(size: 9)
                     .foregroundStyle(.secondary)
             }

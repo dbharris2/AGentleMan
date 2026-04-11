@@ -26,6 +26,7 @@ final class AppCoordinator {
     }
 
     var isAgentPanelVisible = true
+    var composerInsert: String?
 
     init(
         loadStateFromDisk: Bool = true,

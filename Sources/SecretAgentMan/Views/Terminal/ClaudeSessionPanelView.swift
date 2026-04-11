@@ -81,6 +81,12 @@ struct ClaudeSessionPanelView: View {
         .onChange(of: agent.id) { _, newId in
             coordinator.ensureClaudeSession(for: newId)
         }
+        .onChange(of: coordinator.composerInsert) { _, text in
+            if let text {
+                draft = text
+                coordinator.composerInsert = nil
+            }
+        }
     }
 
     // MARK: - Slash Command Suggestions
