@@ -147,7 +147,7 @@ struct ClaudeSessionPanelView: View {
             fontScale: fontScale,
             statusText: pendingElicitation != nil ? "Answering question..." : composerStatusText,
             statusColor: pendingElicitation != nil ? theme.yellow : .secondary,
-            sendDisabled: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            sendDisabled: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingImages.isEmpty,
             onSend: sendDraft,
             onKeyPress: handleComposerKeyPress,
             onDraftChange: { slashSelectionIndex = 0 }
@@ -217,12 +217,12 @@ struct ClaudeSessionPanelView: View {
 
     private func sendDraft() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty || !pendingImages.isEmpty else { return }
         if pendingElicitation != nil {
             coordinator.answerClaudeElicitation(for: agent.id, answer: text)
         } else {
             let images = pendingImages
-            coordinator.sendClaudeMessage(for: agent.id, text: text, images: images.map { ($0.data, $0.mediaType) })
+            coordinator.sendClaudeMessage(for: agent.id, text: text.isEmpty ? "[Image]" : text, images: images.map { ($0.data, $0.mediaType) })
         }
         draft = ""
         pendingImages.removeAll()

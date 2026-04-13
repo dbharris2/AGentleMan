@@ -37,7 +37,8 @@ struct SessionChatView: View {
                                     role: item.role,
                                     label: SessionPanelTheme.label(for: item.role, providerName: providerName),
                                     text: item.text,
-                                    fontScale: fontScale
+                                    fontScale: fontScale,
+                                    images: item.images
                                 )
                             case let .systemGroup(items, groupId):
                                 systemGroupView(items: items, groupId: groupId)
