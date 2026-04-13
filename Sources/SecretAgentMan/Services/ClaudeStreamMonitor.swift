@@ -255,7 +255,7 @@ final class ClaudeStreamMonitor {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         transcriptItems[agentId, default: []].append(
-            CodexTranscriptItem(id: UUID().uuidString, role: .user, text: trimmed)
+            CodexTranscriptItem(id: UUID().uuidString, role: .user, text: trimmed, images: images.map(\.0))
         )
         // Immediately show "thinking" — don't wait for the first stream event.
         runtimeStates[agentId] = .active

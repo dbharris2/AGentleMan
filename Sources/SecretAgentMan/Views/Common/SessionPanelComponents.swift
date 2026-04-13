@@ -26,6 +26,7 @@ struct SessionTranscriptBubble: View {
     let label: String
     let text: String
     let fontScale: Double
+    var images: [Data] = []
     @Environment(\.appTheme) private var theme
 
     private var isUser: Bool {
@@ -45,10 +46,27 @@ struct SessionTranscriptBubble: View {
             HStack {
                 Spacer(minLength: 40)
 
-                SessionMarkdownText(text: text, fontScale: fontScale)
-                    .padding(12)
-                    .background(SessionPanelTheme.backgroundColor(for: role, in: theme))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                VStack(alignment: .trailing, spacing: 8) {
+                    if !images.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(Array(images.enumerated()), id: \.offset) { _, data in
+                                if let nsImage = NSImage(data: data) {
+                                    Image(nsImage: nsImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(maxWidth: 200, maxHeight: 150)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        .onTapGesture { openImageData(data) }
+                                }
+                            }
+                        }
+                    }
+
+                    SessionMarkdownText(text: text, fontScale: fontScale)
+                }
+                .padding(12)
+                .background(SessionPanelTheme.backgroundColor(for: role, in: theme))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         } else {
             // Assistant/system messages: no bubble, just text
@@ -57,6 +75,13 @@ struct SessionTranscriptBubble: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private func openImageData(_ data: Data) {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sam-\(UUID().uuidString).png")
+        try? data.write(to: tmp)
+        NSWorkspace.shared.open(tmp)
     }
 }
 
@@ -173,9 +198,21 @@ struct SessionQuestionCard: View {
     }
 }
 
-struct PendingImage {
+struct PendingImage: Identifiable {
+    let id = UUID()
     let data: Data
     let mediaType: String
+
+    var nsImage: NSImage? {
+        NSImage(data: data)
+    }
+
+    func openInPreview() {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sam-\(id.uuidString).png")
+        try? data.write(to: tmp)
+        NSWorkspace.shared.open(tmp)
+    }
 }
 
 struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
@@ -216,23 +253,14 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
                     }
 
                 if !pendingImages.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "photo")
-                            .scaledFont(size: 11)
-                        Text("\(pendingImages.count) image\(pendingImages.count == 1 ? "" : "s") attached")
-                            .scaledFont(size: 11)
-                        Button {
-                            pendingImages.removeAll()
-                            draft = draft.replacingOccurrences(of: " [Image]", with: "")
-                                .replacingOccurrences(of: "[Image]", with: "")
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .scaledFont(size: 11)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(pendingImages) { img in
+                                pendingImageThumbnail(img)
+                            }
                         }
-                        .buttonStyle(.plain)
+                        .padding(.horizontal, 8)
                     }
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
                 }
 
                 HStack {
@@ -257,6 +285,39 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
         }
     }
 
+    private func pendingImageThumbnail(_ img: PendingImage) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let nsImage = img.nsImage {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(theme.foreground.opacity(0.15), lineWidth: 1)
+            )
+            .onTapGesture { img.openInPreview() }
+
+            Button {
+                pendingImages.removeAll { $0.id == img.id }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .black.opacity(0.6))
+            }
+            .buttonStyle(.plain)
+            .offset(x: 4, y: -4)
+        }
+    }
+
     private func pasteImageFromClipboard() -> Bool {
         let pb = NSPasteboard.general
         guard pb.canReadItem(withDataConformingToTypes: [
@@ -271,7 +332,6 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
         else { return false }
 
         pendingImages.append(PendingImage(data: png, mediaType: "image/png"))
-        draft += draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "[Image]" : " [Image]"
         return true
     }
 }

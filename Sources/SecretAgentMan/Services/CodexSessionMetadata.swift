@@ -47,6 +47,11 @@ struct CodexTranscriptItem: Identifiable, Equatable {
     let id: String
     let role: CodexTranscriptRole
     let text: String
+    var images: [Data] = []
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.role == rhs.role && lhs.text == rhs.text
+    }
 }
 
 enum CodexApprovalKind: Equatable {
