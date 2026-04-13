@@ -751,7 +751,13 @@ private final class Observer: @unchecked Sendable {
         if let mode = event["permissionMode"] as? String {
             delegate.permissionModeChanged(agent.id, mode)
         }
-        publishIfChanged(.active)
+        // Only transition to .active on the initial system event (session start).
+        // Later system events (e.g. permission mode changes) are config acks and
+        // should not flip state from .awaitingInput → .active (which shows the
+        // "thinking" indicator spuriously).
+        if lastObservedState == nil {
+            publishIfChanged(.active)
+        }
     }
 
     private func handleAssistantEvent(_ event: [String: Any]) {
