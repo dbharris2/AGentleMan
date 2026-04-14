@@ -349,21 +349,6 @@ final class ClaudeStreamMonitor {
         return items
     }
 
-    /// Extract the name of the last tool_use block from an assistant event, if any.
-    nonisolated static func lastToolUseName(in event: [String: Any]) -> String? {
-        guard let message = event["message"] as? [String: Any],
-              let content = message["content"] as? [[String: Any]]
-        else { return nil }
-        // Walk backwards to find the last tool_use block
-        for block in content.reversed() {
-            if block["type"] as? String == "tool_use",
-               let name = block["name"] as? String {
-                return name
-            }
-        }
-        return nil
-    }
-
     private nonisolated static func toolUseSummary(name: String, input: [String: Any]?) -> String {
         switch name {
         case "Bash":
@@ -664,6 +649,7 @@ private final class Observer: @unchecked Sendable {
             "--print",
             "--output-format", "stream-json",
             "--input-format", "stream-json",
+            "--include-partial-messages",
             "--permission-prompt-tool", "stdio",
             "--permission-mode", "default",
             "--verbose",
@@ -797,12 +783,6 @@ private final class Observer: @unchecked Sendable {
         for item in ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: event) {
             delegate.transcriptItem(agent.id, item)
         }
-
-        // If the last content block is a tool_use, set the active tool name
-        // so the thinking bubble shows "Running Bash…" while the tool executes.
-        let lastToolName = ClaudeStreamMonitor.lastToolUseName(in: event)
-        delegate.activeToolChanged(agent.id, lastToolName)
-
         publishIfChanged(.active)
     }
 
@@ -832,6 +812,17 @@ private final class Observer: @unchecked Sendable {
               let innerType = inner["type"] as? String
         else { return }
 
+        // Track active tool from content_block_start events
+        if innerType == "content_block_start",
+           let block = inner["content_block"] as? [String: Any],
+           let blockType = block["type"] as? String {
+            if blockType == "tool_use", let name = block["name"] as? String {
+                delegate.activeToolChanged(agent.id, name)
+            } else if blockType == "text" {
+                delegate.activeToolChanged(agent.id, nil)
+            }
+        }
+
         if innerType == "content_block_delta",
            let delta = inner["delta"] as? [String: Any],
            let deltaType = delta["type"] as? String,
@@ -848,6 +839,7 @@ private final class Observer: @unchecked Sendable {
 
         if innerType == "message_stop" {
             finalizeStreaming()
+            delegate.activeToolChanged(agent.id, nil)
         }
 
         publishIfChanged(.active)
