@@ -12,11 +12,9 @@ struct AgentRowView: View {
             AgentProviderIconView(provider: agent.provider)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(agent.name)
-                        .scaledFont(size: 13, weight: isSelected ? .semibold : .regular)
-                        .lineLimit(1)
-                }
+                Text(agent.name)
+                    .scaledFont(size: 13, weight: isSelected ? .semibold : .regular)
+                    .lineLimit(1)
 
                 if let branch = branchName {
                     BranchInfoView(branchName: branch)
@@ -36,8 +34,7 @@ struct AgentRowView: View {
 
             StatusBadge(state: agent.state)
         }
-        .padding(.top, 6)
-        .padding(.bottom, 4)
+        .padding(.vertical, 4)
         .contentShape(Rectangle())
         .hoverHighlight()
     }
