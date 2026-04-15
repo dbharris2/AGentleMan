@@ -149,19 +149,6 @@ struct StatusBarView: View {
             .help("Toggle Terminal (Cmd+J)")
             .statusBarPill(isSelected: isShellPanelVisible)
 
-            Button {
-                coordinator.isAgentPanelVisible.toggle()
-            } label: {
-                Image(systemName: "sparkle")
-                    .scaledFont(size: 11)
-                    .foregroundStyle(
-                        coordinator.isAgentPanelVisible ? theme.accent : .secondary
-                    )
-            }
-            .buttonStyle(.plain)
-            .help("Toggle Agent Panel")
-            .statusBarPill(isSelected: coordinator.isAgentPanelVisible)
-
             Divider()
                 .frame(height: 16)
                 .padding(.horizontal, 8)
@@ -225,6 +212,12 @@ struct StatusBarView: View {
                 }
                 .padding(.trailing, 8)
             }
+
+            Divider()
+                .frame(height: 16)
+                .padding(.horizontal, 4)
+
+            VersionBadgeView()
         }
         .padding(.horizontal, 10)
         .frame(height: 26)

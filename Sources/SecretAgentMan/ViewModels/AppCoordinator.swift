@@ -25,7 +25,6 @@ final class AppCoordinator {
         }
     }
 
-    var isAgentPanelVisible = true
     var composerInsert: String?
 
     init(

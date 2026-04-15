@@ -22,6 +22,55 @@ struct SidebarView: View {
 
     var body: some View {
         let collapsedSet = collapsedFolders
+        VStack(spacing: 0) {
+            newAgentButton
+            Divider()
+            agentList(collapsedSet: collapsedSet)
+        }
+        .background(theme.surface)
+        .frame(minWidth: 200)
+        .sheet(isPresented: $showingNewAgent) {
+            NewAgentSheet(store: coordinator.store, isPresented: $showingNewAgent)
+        }
+        .alert("Rename Agent", isPresented: Binding(
+            get: { renamingAgentId != nil },
+            set: { if !$0 { renamingAgentId = nil } }
+        )) {
+            TextField("Name", text: $renameText)
+            Button("Cancel", role: .cancel) { renamingAgentId = nil }
+            Button("Rename") {
+                if let id = renamingAgentId, !renameText.isEmpty {
+                    coordinator.store.renameAgent(id: id, name: renameText)
+                }
+                renamingAgentId = nil
+            }
+        }
+    }
+
+    private var newAgentButton: some View {
+        Button {
+            showingNewAgent = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "square.and.pencil")
+                    .scaledFont(size: 13)
+                    .foregroundStyle(theme.accent)
+                    .frame(width: 16)
+                Text("New Agent")
+                    .scaledFont(size: 13, weight: .medium)
+                    .foregroundStyle(theme.foreground)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut("n")
+        .help("New Agent (⌘N)")
+    }
+
+    private func agentList(collapsedSet: Set<String>) -> some View {
         List(selection: selectionBinding) {
             ForEach(groupedAgents, id: \.folder) { group in
                 let isExpanded = folderExpandedBinding(for: group.folder, in: collapsedSet)
@@ -73,34 +122,6 @@ struct SidebarView: View {
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(theme.surface)
-        .frame(minWidth: 200)
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    showingNewAgent = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .help("New Agent (Cmd+N)")
-                .keyboardShortcut("n")
-            }
-        }
-        .sheet(isPresented: $showingNewAgent) {
-            NewAgentSheet(store: coordinator.store, isPresented: $showingNewAgent)
-        }
-        .alert("Rename Agent", isPresented: Binding(
-            get: { renamingAgentId != nil },
-            set: { if !$0 { renamingAgentId = nil } }
-        )) {
-            TextField("Name", text: $renameText)
-            Button("Cancel", role: .cancel) { renamingAgentId = nil }
-            Button("Rename") {
-                if let id = renamingAgentId, !renameText.isEmpty {
-                    coordinator.store.renameAgent(id: id, name: renameText)
-                }
-                renamingAgentId = nil
-            }
-        }
     }
 
     private var collapsedFolders: Set<String> {

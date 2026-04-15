@@ -34,6 +34,18 @@ struct SecretAgentManApp: App {
         }
         .commands {
             CommandMenu("View") {
+                Button("Toggle Sidebar") {
+                    NotificationCenter.default.post(name: .toggleLeftPanel, object: nil)
+                }
+                .keyboardShortcut("[", modifiers: [.command, .shift])
+
+                Button("Toggle Inspector") {
+                    NotificationCenter.default.post(name: .toggleRightPanel, object: nil)
+                }
+                .keyboardShortcut("]", modifiers: [.command, .shift])
+
+                Divider()
+
                 Button(isShellPanelVisible ? "Hide Terminal" : "Show Terminal") {
                     isShellPanelVisible.toggle()
                 }
