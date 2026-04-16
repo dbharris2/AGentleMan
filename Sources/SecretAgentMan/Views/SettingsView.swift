@@ -23,6 +23,7 @@ struct GeneralSettingsView: View {
     @AppStorage(UserDefaultsKeys.terminalTheme) private var selectedTheme = "Catppuccin Mocha"
     @AppStorage(UserDefaultsKeys.claudePluginDirectory) private var claudePluginDirectory = ""
     @AppStorage(UserDefaultsKeys.defaultAgentFolder) private var defaultAgentFolder = ""
+    @AppStorage(UserDefaultsKeys.codexApprovalPolicy) private var codexApprovalPolicy = CodexApprovalPolicy.onRequest.rawValue
     @State private var searchText = ""
     @State private var allThemes: [String] = []
     @State private var listSelection: String?
@@ -88,9 +89,21 @@ struct GeneralSettingsView: View {
                 Text("Codex")
                     .font(.headline)
 
+                Picker("Approval Policy", selection: $codexApprovalPolicy) {
+                    ForEach(CodexApprovalPolicy.allCases, id: \.rawValue) { policy in
+                        Text(policy.label).tag(policy.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                if let policy = CodexApprovalPolicy(rawValue: codexApprovalPolicy) {
+                    Text(policy.settingsDescription)
+                }
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Configuration is read from ~/.codex/config.toml")
                     Text("Plugins and MCP servers are discovered from ~/.codex")
+                    Text("Approval policy is applied to new Codex turns and future session starts.")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

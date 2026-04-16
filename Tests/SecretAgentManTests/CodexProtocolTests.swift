@@ -62,8 +62,17 @@ struct CodexProtocolTests {
         #expect(json["method"] as? String == "thread/start")
         let params = try #require(json["params"] as? [String: Any])
         #expect(params["cwd"] as? String == "/tmp")
-        #expect(params["approvalPolicy"] as? String == "untrusted")
+        #expect(params["approvalPolicy"] as? String == "on-request")
         #expect(params["sandbox"] as? String == "workspace-write")
+    }
+
+    @Test
+    func threadStartSupportsCustomApprovalPolicy() throws {
+        let req = CodexProtocol.RPCRequest.threadStart(id: 3, cwd: "/tmp", approvalPolicy: "never")
+        let json = try requireJSON(req)
+
+        let params = try #require(json["params"] as? [String: Any])
+        #expect(params["approvalPolicy"] as? String == "never")
     }
 
     @Test

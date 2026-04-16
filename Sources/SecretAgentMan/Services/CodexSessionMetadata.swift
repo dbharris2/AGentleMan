@@ -1,5 +1,39 @@
 import Foundation
 
+enum CodexApprovalPolicy: String, CaseIterable, Codable {
+    case untrusted
+    case onFailure = "on-failure"
+    case onRequest = "on-request"
+    case never
+
+    var label: String {
+        switch self {
+        case .untrusted: "Ask Every Time"
+        case .onFailure: "On Failure"
+        case .onRequest: "Accept Edits"
+        case .never: "Auto"
+        }
+    }
+
+    var settingsDescription: String {
+        switch self {
+        case .untrusted:
+            "Prompt for edits and other approvals."
+        case .onFailure:
+            "Let normal work proceed and only ask when something is blocked or fails."
+        case .onRequest:
+            "Only prompt when the agent explicitly requests approval."
+        case .never:
+            "Do not ask for approval. Best for trusted local sessions."
+        }
+    }
+
+    static var storedValue: CodexApprovalPolicy {
+        let raw = UserDefaults.standard.string(forKey: UserDefaultsKeys.codexApprovalPolicy)
+        return CodexApprovalPolicy(rawValue: raw ?? "") ?? .onRequest
+    }
+}
+
 enum CodexCollaborationMode: String, CaseIterable, Codable {
     case `default`
     case plan
@@ -56,7 +90,7 @@ struct CodexTranscriptItem: Identifiable, Equatable {
 
 enum CodexApprovalKind: Equatable {
     case command(command: String?, reason: String?)
-    case fileChange(reason: String?)
+    case fileChange(reason: String?, grantRoot: String?)
     case unsupportedPermissions(reason: String?)
 
     var title: String {
@@ -73,11 +107,15 @@ enum CodexApprovalKind: Equatable {
     var detail: String {
         switch self {
         case let .command(command, reason):
-            [command, reason].compactMap(\.self).joined(separator: "\n\n")
-        case let .fileChange(reason):
-            reason ?? "Codex requested approval for a file change."
+            return [command, reason].compactMap(\.self).joined(separator: "\n\n")
+        case let .fileChange(reason, grantRoot):
+            let parts = [
+                reason,
+                grantRoot.map { "Write scope: \($0)" },
+            ].compactMap(\.self)
+            return parts.isEmpty ? "Codex requested approval for a file change." : parts.joined(separator: "\n\n")
         case let .unsupportedPermissions(reason):
-            reason ?? "Codex requested additional permissions."
+            return reason ?? "Codex requested additional permissions."
         }
     }
 
@@ -164,7 +202,10 @@ extension CodexAppServerMonitor {
                 reason: params["reason"] as? String
             )
         case "item/fileChange/requestApproval":
-            kind = .fileChange(reason: params["reason"] as? String)
+            kind = .fileChange(
+                reason: params["reason"] as? String,
+                grantRoot: params["grantRoot"] as? String
+            )
         case "item/permissions/requestApproval":
             kind = .unsupportedPermissions(reason: params["reason"] as? String)
         default:
