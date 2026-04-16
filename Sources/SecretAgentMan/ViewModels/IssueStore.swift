@@ -71,13 +71,6 @@ final class IssueStore {
 
         let previousSelection = store.selectedAgentId
         let truncatedTitle = String(issue.title.prefix(40))
-        let issueAgent = store.addAgent(
-            name: "Issue #\(issue.number) - \(truncatedTitle)",
-            folder: folder,
-            provider: .claude
-        )
-        store.selectAgent(id: previousSelection)
-
         let prompt = """
         Work on issue #\(issue.number): \(issue.title)
         \(issue.url.absoluteString)
@@ -86,11 +79,12 @@ final class IssueStore {
         Plan your approach, then implement the changes.
         """
 
-        store.addPendingPrompt(PendingPrompt(
-            agentId: issueAgent.id,
-            source: .workOnIssue,
-            summary: "Work on: \(issue.repository) #\(issue.number)",
-            fullPrompt: prompt
-        ))
+        _ = store.addAgent(
+            name: "Issue #\(issue.number) - \(truncatedTitle)",
+            folder: folder,
+            provider: .claude,
+            initialPrompt: prompt
+        )
+        store.selectAgent(id: previousSelection)
     }
 }

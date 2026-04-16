@@ -17,7 +17,6 @@ final class PRStore {
     var selectedPRChanges: [FileChange] = []
 
     @ObservationIgnored private let store: AgentStore
-    @ObservationIgnored private let terminalManager: TerminalManager
     @ObservationIgnored private let eventBus: AgentEventBus
     @ObservationIgnored private let repositoryMonitor: RepositoryMonitor
     @ObservationIgnored private var repoNames: [String: String] = [:]
@@ -26,14 +25,12 @@ final class PRStore {
 
     init(
         store: AgentStore,
-        terminalManager: TerminalManager,
         eventBus: AgentEventBus,
         repositoryMonitor: RepositoryMonitor,
         githubPRService: GitHubPRService = GitHubPRService(),
         automationPolicy: PRAutomationPolicy = PRAutomationPolicy()
     ) {
         self.store = store
-        self.terminalManager = terminalManager
         self.eventBus = eventBus
         self.repositoryMonitor = repositoryMonitor
         self.githubPRService = githubPRService
@@ -125,13 +122,6 @@ final class PRStore {
         guard let folder = matchingAgent?.folder else { return }
 
         let previousSelection = store.selectedAgentId
-        let reviewAgent = store.addAgent(
-            name: "PR #\(pr.number) - Review",
-            folder: folder,
-            provider: .claude
-        )
-        store.selectAgent(id: previousSelection)
-
         let prompt = """
         Review PR #\(pr.number) at \(pr.url.absoluteString)
 
@@ -148,12 +138,13 @@ final class PRStore {
         Do NOT post comments to GitHub. Just provide your analysis here.
         """
 
-        store.addPendingPrompt(PendingPrompt(
-            agentId: reviewAgent.id,
-            source: .reviewPR,
-            summary: "Diff review: \(pr.repository) #\(pr.number)",
-            fullPrompt: prompt
-        ))
+        _ = store.addAgent(
+            name: "PR #\(pr.number) - Review",
+            folder: folder,
+            provider: .claude,
+            initialPrompt: prompt
+        )
+        store.selectAgent(id: previousSelection)
     }
 
     private struct MatchedPR {
@@ -244,12 +235,8 @@ final class PRStore {
         new: PRInfo,
         pr: GitHubPRService.GitHubPR
     ) {
-        let agents = store.agents.filter { $0.folder.standardizedFileURL == folder.standardizedFileURL }
-        guard !agents.isEmpty else { return }
-
         let settings = automationSettings()
         let initialPlan = automationPolicy.initialPlan(old: old, new: new, settings: settings)
-        applyPromptRemovals(initialPlan.removedPromptSources, to: agents)
 
         guard initialPlan.needsDeepFetch else { return }
 
@@ -268,9 +255,7 @@ final class PRStore {
             }
 
             let deepPlan = automationPolicy.deepPlan(old: old, new: new, details: details, settings: settings)
-            applyPromptRemovals(deepPlan.removedPromptSources, to: agents)
             publishEvents(deepPlan.events, folder: folder)
-            applyPromptRequests(deepPlan.prompts, to: agents)
         }
     }
 
@@ -279,17 +264,6 @@ final class PRStore {
             autoFixCI: Self.userDefault(forKey: UserDefaultsKeys.autoFixCIFailures, default: true),
             autoAnalyzeReviews: Self.userDefault(forKey: UserDefaultsKeys.autoAnalyzeReviews, default: true)
         )
-    }
-
-    private func applyPromptRemovals(
-        _ sources: [PendingPrompt.PromptSource],
-        to agents: [Agent]
-    ) {
-        for source in sources {
-            for agent in agents {
-                store.removePendingPrompts(for: agent.id, source: source)
-            }
-        }
     }
 
     private func publishEvents(_ events: [PRAutomationPolicy.EventKind], folder: URL) {
@@ -301,27 +275,6 @@ final class PRStore {
                 eventBus.publish(.checksFailed(folder: folder))
             case .approvedWithComments:
                 eventBus.publish(.approvedWithComments(folder: folder))
-            }
-        }
-    }
-
-    private func applyPromptRequests(
-        _ prompts: [PRAutomationPolicy.PromptRequest],
-        to agents: [Agent]
-    ) {
-        for prompt in prompts {
-            for agent in agents {
-                if prompt.sendDirectlyToAwaitingAgents, agent.state == .awaitingInput {
-                    terminalManager.sendInput(to: agent.id, text: prompt.fullPrompt)
-                    continue
-                }
-
-                store.addPendingPrompt(PendingPrompt(
-                    agentId: agent.id,
-                    source: prompt.source,
-                    summary: prompt.summary,
-                    fullPrompt: prompt.fullPrompt
-                ))
             }
         }
     }

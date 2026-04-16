@@ -14,22 +14,20 @@ struct PRAutomationPolicyTests {
         let plan = policy.initialPlan(old: old, new: new, settings: settings)
 
         #expect(plan.needsDeepFetch)
-        #expect(plan.removedPromptSources.isEmpty)
     }
 
     @Test
-    func initialPlanRemovesResolvedFailureAndObsoleteReviewPrompts() {
+    func initialPlanRequestsDeepFetchForResolvedFailureAndApproval() {
         let old = makeInfo(state: .changesRequested, checkStatus: .fail)
         let new = makeInfo(state: .approved, checkStatus: .pass)
 
         let plan = policy.initialPlan(old: old, new: new, settings: settings)
 
         #expect(plan.needsDeepFetch)
-        #expect(plan.removedPromptSources == [.ciFailed, .changesRequested])
     }
 
     @Test
-    func deepPlanBuildsFailurePromptAndEvent() throws {
+    func deepPlanEmitsCheckFailedEvent() {
         let old = makeInfo(state: .needsReview, checkStatus: .pending)
         let new = makeInfo(state: .needsReview, checkStatus: .fail)
         let details = PRAutomationPolicy.DeepDetails(
@@ -41,15 +39,10 @@ struct PRAutomationPolicyTests {
         let plan = policy.deepPlan(old: old, new: new, details: details, settings: settings)
 
         #expect(plan.events == [.checksFailed])
-        let prompt = try #require(plan.prompts.first)
-        #expect(prompt.source == .ciFailed)
-        #expect(prompt.sendDirectlyToAwaitingAgents)
-        #expect(prompt.summary == "Failed: ci / unit, ci / lint")
-        #expect(prompt.fullPrompt.contains("Please investigate and fix the failures."))
     }
 
     @Test
-    func deepPlanBuildsReviewFeedbackPrompt() throws {
+    func deepPlanEmitsChangesRequestedEvent() {
         let old = makeInfo(state: .needsReview, checkStatus: .pass)
         let new = makeInfo(state: .changesRequested, checkStatus: .pass)
         let details = PRAutomationPolicy.DeepDetails(
@@ -64,14 +57,10 @@ struct PRAutomationPolicyTests {
         let plan = policy.deepPlan(old: old, new: new, details: details, settings: settings)
 
         #expect(plan.events == [.changesRequested])
-        let prompt = try #require(plan.prompts.first)
-        #expect(prompt.source == .changesRequested)
-        #expect(prompt.summary == "2 review comment(s)")
-        #expect(prompt.fullPrompt.contains("Please add tests."))
     }
 
     @Test
-    func deepPlanBuildsApprovalPromptOnlyForNewApprovalComments() throws {
+    func deepPlanEmitsApprovalEventOnlyForNewApprovalComments() {
         let old = makeInfo(
             state: .changesRequested,
             checkStatus: .pass,
@@ -89,12 +78,7 @@ struct PRAutomationPolicyTests {
 
         let plan = policy.deepPlan(old: old, new: new, details: details, settings: settings)
 
-        #expect(plan.removedPromptSources == [.changesRequested])
         #expect(plan.events == [.approvedWithComments])
-        let prompt = try #require(plan.prompts.first)
-        #expect(prompt.source == .approvedWithComments)
-        #expect(prompt.summary == "2 comment(s) on approval")
-        #expect(prompt.fullPrompt.contains("Looks good with one note."))
     }
 
     private func makeInfo(
