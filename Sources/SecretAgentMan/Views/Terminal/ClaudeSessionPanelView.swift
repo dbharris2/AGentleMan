@@ -10,6 +10,7 @@ struct ClaudeSessionPanelView: View {
     @State private var draft = ""
     @State private var slashSelectionIndex = 0
     @State private var pendingImages: [PendingImage] = []
+    @FocusState private var composerFocused: Bool
 
     private var transcript: [CodexTranscriptItem] {
         coordinator.claudeMonitor.transcriptItems[agent.id] ?? []
@@ -98,6 +99,9 @@ struct ClaudeSessionPanelView: View {
                 coordinator.composerInsert = nil
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .focusComposer)) { _ in
+            composerFocused = true
+        }
     }
 
     // MARK: - Slash Command Suggestions
@@ -150,6 +154,7 @@ struct ClaudeSessionPanelView: View {
         SessionComposer(
             draft: $draft,
             pendingImages: $pendingImages,
+            composerFocused: $composerFocused,
             fontScale: fontScale,
             statusText: pendingElicitation != nil ? "Answering question..." : composerStatusText,
             statusColor: pendingElicitation != nil ? theme.yellow : .secondary,

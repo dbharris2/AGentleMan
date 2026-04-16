@@ -16,7 +16,10 @@ struct ShellPanelView: View {
     var body: some View {
         TerminalContainerView(
             selectedAgentId: displayedAgentId,
-            terminal: displayedTerminal
+            terminal: displayedTerminal,
+            onEmbed: { terminal in
+                terminal.window?.makeFirstResponder(terminal)
+            }
         )
         .onAppear { syncTerminal() }
         .onChange(of: selectedAgentId) { _, _ in syncTerminal() }

@@ -106,10 +106,8 @@ struct ContentView: View {
                 coordinator.syncWatchedAgents()
             }
             .onChange(of: isShellPanelVisible) {
-                if isShellPanelVisible, let id = coordinator.store.selectedAgentId {
-                    DispatchQueue.main.async {
-                        coordinator.shellManager.focusTerminal(for: id)
-                    }
+                if !isShellPanelVisible {
+                    NotificationCenter.default.post(name: .focusComposer, object: nil)
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .toggleLeftPanel)) { _ in
@@ -169,4 +167,5 @@ struct ContentView: View {
 extension Notification.Name {
     static let toggleLeftPanel = Notification.Name("SecretAgentMan.toggleLeftPanel")
     static let toggleRightPanel = Notification.Name("SecretAgentMan.toggleRightPanel")
+    static let focusComposer = Notification.Name("SecretAgentMan.focusComposer")
 }

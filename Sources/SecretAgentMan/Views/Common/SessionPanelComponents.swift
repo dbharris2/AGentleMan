@@ -253,6 +253,7 @@ struct PendingImage: Identifiable {
 struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
     @Binding var draft: String
     @Binding var pendingImages: [PendingImage]
+    var composerFocused: FocusState<Bool>.Binding
     let fontScale: Double
     let statusText: String
     let statusColor: Color
@@ -270,6 +271,7 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 TextEditor(text: $draft)
+                    .focused(composerFocused)
                     .font(.system(size: 13 * fontScale, design: .monospaced))
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 80, maxHeight: 140)
