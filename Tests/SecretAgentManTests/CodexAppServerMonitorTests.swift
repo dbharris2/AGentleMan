@@ -81,6 +81,27 @@ struct CodexAppServerMonitorTests {
     }
 
     @Test
+    func parsesFileChangeApprovalGrantRoot() {
+        let agentId = UUID()
+        let request = CodexAppServerMonitor.approvalRequest(
+            agentId: agentId,
+            requestId: 17,
+            method: "item/fileChange/requestApproval",
+            params: [
+                "threadId": "thread-123",
+                "turnId": "turn-123",
+                "itemId": "item-123",
+                "reason": "Need write access outside the workspace.",
+                "grantRoot": "/tmp/shared",
+            ]
+        )
+
+        #expect(request?.agentId == agentId)
+        #expect(request?.requestId == 17)
+        #expect(request?.kind.detail == "Need write access outside the workspace.\n\nWrite scope: /tmp/shared")
+    }
+
+    @Test
     func parsesTranscriptItemFromSessionEvent() {
         let item = CodexAppServerMonitor.transcriptItem(fromSessionEvent: [
             "type": "response_item",

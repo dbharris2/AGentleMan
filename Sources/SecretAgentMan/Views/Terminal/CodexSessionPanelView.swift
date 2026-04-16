@@ -169,6 +169,17 @@ struct CodexSessionPanelView: View {
             coordinator.answerCodexApproval(for: agent.id, accept: true)
         } onDecline: {
             coordinator.answerCodexApproval(for: agent.id, accept: false)
+        } onApproveAndSwitchMode: { mode in
+            let policy: CodexApprovalPolicy = switch mode {
+            case "acceptEdits":
+                .onRequest
+            case "auto":
+                .never
+            default:
+                .untrusted
+            }
+            coordinator.setCodexApprovalPolicy(for: agent.id, policy: policy)
+            coordinator.answerCodexApproval(for: agent.id, accept: true)
         }
     }
 

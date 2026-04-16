@@ -126,6 +126,10 @@ final class CodexAppServerMonitor {
         observers[agentId]?.setCollaborationMode(mode)
     }
 
+    func setApprovalPolicy(for agentId: UUID, policy: CodexApprovalPolicy) {
+        observers[agentId]?.setApprovalPolicy(policy)
+    }
+
     func respondToApproval(for agentId: UUID, accept: Bool) {
         observers[agentId]?.respondToApproval(accept: accept)
     }
@@ -214,6 +218,7 @@ private final class Observer: @unchecked Sendable {
     private var sessionFilePath: String?
     private var rawModelName = "gpt-5.4"
     private var collaborationMode: CodexCollaborationMode = .default
+    private var approvalPolicy: CodexApprovalPolicy = .storedValue
 
     init(
         agent: Agent,
@@ -319,12 +324,16 @@ private final class Observer: @unchecked Sendable {
     }
 
     private func startOrResumeThread() {
+        approvalPolicy = .storedValue
+
         if agent.hasLaunched, let threadId = agent.sessionId, !threadId.isEmpty {
             sendRequest(
                 method: "thread/resume",
                 params: [
                     "threadId": threadId,
                     "cwd": agent.folder.path,
+                    "approvalPolicy": approvalPolicy.rawValue,
+                    "sandbox": "workspace-write",
                 ]
             ) { [weak self] response in
                 self?.finishThreadBootstrap(response: response)
@@ -336,7 +345,7 @@ private final class Observer: @unchecked Sendable {
             method: "thread/start",
             params: [
                 "cwd": agent.folder.path,
-                "approvalPolicy": "untrusted",
+                "approvalPolicy": approvalPolicy.rawValue,
                 "sandbox": "workspace-write",
                 "personality": "pragmatic",
             ]
@@ -425,6 +434,7 @@ private final class Observer: @unchecked Sendable {
             params: [
                 "threadId": threadId,
                 "input": input,
+                "approvalPolicy": approvalPolicy.rawValue,
                 "collaborationMode": collaborationModePayload(),
             ]
         ) { _ in }
@@ -439,6 +449,10 @@ private final class Observer: @unchecked Sendable {
             mode,
             0
         )
+    }
+
+    func setApprovalPolicy(_ policy: CodexApprovalPolicy) {
+        approvalPolicy = policy
     }
 
     func debugTriggerUserInput() {
@@ -538,6 +552,7 @@ private final class Observer: @unchecked Sendable {
                             "text": message,
                         ],
                     ],
+                    "approvalPolicy": approvalPolicy.rawValue,
                     "collaborationMode": collaborationModePayload(),
                 ]
             ) { _ in }

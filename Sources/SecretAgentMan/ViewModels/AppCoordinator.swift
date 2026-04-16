@@ -118,6 +118,12 @@ final class AppCoordinator {
         codexMonitor.setCollaborationMode(for: agentId, mode: mode)
     }
 
+    func setCodexApprovalPolicy(for agentId: UUID, policy: CodexApprovalPolicy) {
+        UserDefaults.standard.set(policy.rawValue, forKey: UserDefaultsKeys.codexApprovalPolicy)
+        agentSessions.ensureCodexSession(for: agentId)
+        codexMonitor.setApprovalPolicy(for: agentId, policy: policy)
+    }
+
     func triggerCodexUserInputTest(for agentId: UUID) {
         codexMonitor.debugTriggerUserInput(for: agentId)
     }

@@ -23,7 +23,7 @@ enum CodexProtocol {
             ])
         }
 
-        static func threadStart(id: Int, cwd: String, approvalPolicy: String = "untrusted") -> RPCRequest {
+        static func threadStart(id: Int, cwd: String, approvalPolicy: String = "on-request") -> RPCRequest {
             RPCRequest(id: id, method: "thread/start", params: [
                 "cwd": .string(cwd),
                 "approvalPolicy": .string(approvalPolicy),
