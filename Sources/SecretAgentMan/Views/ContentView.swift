@@ -144,13 +144,6 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .overlay(alignment: .top) {
-            PendingPromptsBar(
-                store: coordinator.store,
-                selectedAgentId: coordinator.store.selectedAgentId,
-                onSend: { coordinator.sendPrompt($0) }
-            )
-        }
     }
 
     private func migrateLegacyAgentPanelWidth() {

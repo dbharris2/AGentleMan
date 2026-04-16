@@ -11,28 +11,10 @@ final class AgentStore {
 
     var agents: [Agent] = []
     var selectedAgentId: UUID?
-    var pendingPrompts: [PendingPrompt] = []
 
     /// Bumped when a terminal session is restarted so panel views can re-sync
     /// without needing to observe `agents` (which would cause an AttributeGraph cycle).
     var terminalRestartCount = 0
-
-    func addPendingPrompt(_ prompt: PendingPrompt) {
-        guard !pendingPrompts.contains(where: { $0.agentId == prompt.agentId && $0.source == prompt.source }) else { return }
-        pendingPrompts.append(prompt)
-    }
-
-    func removePendingPrompt(id: UUID) {
-        pendingPrompts.removeAll { $0.id == id }
-    }
-
-    func pendingPrompts(for agentId: UUID) -> [PendingPrompt] {
-        pendingPrompts.filter { $0.agentId == agentId }
-    }
-
-    func removePendingPrompts(for agentId: UUID, source: PendingPrompt.PromptSource) {
-        pendingPrompts.removeAll { $0.agentId == agentId && $0.source == source }
-    }
 
     static func persistenceURL(appSupportRoot: URL? = nil) -> URL {
         let dir = (appSupportRoot ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])

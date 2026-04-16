@@ -68,26 +68,6 @@ struct SecretAgentManApp: App {
                 }
                 .keyboardShortcut("0")
             }
-            CommandMenu("Debug") {
-                Button("Test Pending Prompt") {
-                    if let id = coordinator.store.selectedAgentId {
-                        coordinator.store.addPendingPrompt(PendingPrompt(
-                            agentId: id,
-                            source: .ciFailed,
-                            summary: "Test: multi-line prompt",
-                            fullPrompt: """
-                            This is a test multi-line prompt.
-
-                            Line 2: Please confirm you received this as a single message.
-                            Line 3: If you see this all at once, bracketed paste is working.
-
-                            Just say "received" and nothing else.
-                            """
-                        ))
-                    }
-                }
-                .keyboardShortcut("t", modifiers: [.command, .shift])
-            }
             CommandMenu("Agents") {
                 let orderedAgents = coordinator.store.agentsByFolder.flatMap(\.agents)
                 ForEach(Array(orderedAgents.prefix(9).enumerated()), id: \.element.id) { index, agent in

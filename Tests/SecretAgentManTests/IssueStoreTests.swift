@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct IssueStoreTests {
     @Test
-    func workOnIssueCreatesAgentAndPendingPromptWithoutChangingSelection() throws {
+    func workOnIssueCreatesAgentWithInitialPromptWithoutChangingSelection() throws {
         let store = AgentStore(loadFromDisk: false)
         let existingAgent = Agent(
             name: "Existing",
@@ -23,15 +23,10 @@ struct IssueStoreTests {
 
         #expect(store.agents.count == 2)
         #expect(store.selectedAgentId == existingAgent.id)
-        #expect(store.pendingPrompts.count == 1)
 
         let issueAgent = try #require(store.agents.last)
-        let pendingPrompt = try #require(store.pendingPrompts.first)
         #expect(issueAgent.name == "Issue #12 - Fix the widget rendering bug")
-        #expect(pendingPrompt.agentId == issueAgent.id)
-        #expect(pendingPrompt.source == .workOnIssue)
-        #expect(pendingPrompt.summary == "Work on: acme/project #12")
-        #expect(pendingPrompt.fullPrompt.contains("gh issue view 12 --repo acme/project"))
+        #expect(issueAgent.initialPrompt?.contains("gh issue view 12 --repo acme/project") == true)
     }
 
     @Test
@@ -52,7 +47,6 @@ struct IssueStoreTests {
         issueStore.workOnIssue(makeIssue(repository: "acme/project", number: 7))
 
         #expect(store.agents.count == 1)
-        #expect(store.pendingPrompts.isEmpty)
     }
 
     @Test

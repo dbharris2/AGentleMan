@@ -132,18 +132,6 @@ final class AgentSessionCoordinator {
         store.removeAgent(id: id)
     }
 
-    func sendPrompt(_ prompt: PendingPrompt) {
-        guard let agent = store.agents.first(where: { $0.id == prompt.agentId }) else { return }
-        switch agent.provider {
-        case .codex:
-            codexMonitor.ensureSession(for: agent)
-            codexMonitor.sendMessage(for: prompt.agentId, text: prompt.fullPrompt)
-        case .claude:
-            claudeMonitor.ensureSession(for: agent)
-            claudeMonitor.sendMessage(for: prompt.agentId, text: prompt.fullPrompt)
-        }
-    }
-
     func ensureCodexSession(for agentId: UUID) {
         guard let agent = store.agents.first(where: { $0.id == agentId }),
               agent.provider == .codex
@@ -192,19 +180,7 @@ final class AgentSessionCoordinator {
         }
 
         store.updateState(id: agentId, state: state)
-        // Note: .awaitingResponse (elicitation) deliberately does NOT trigger auto-send
-        // or idle events — the agent is blocked on a specific question, not ready for new work.
         if state == .awaitingInput {
-            let autoSendPrompts = store.pendingPrompts(for: agentId).filter(\.autoSend)
-            if let first = autoSendPrompts.first {
-                switch agent.provider {
-                case .codex:
-                    codexMonitor.sendMessage(for: agentId, text: first.fullPrompt)
-                case .claude:
-                    claudeMonitor.sendMessage(for: agentId, text: first.fullPrompt)
-                }
-                store.removePendingPrompt(id: first.id)
-            }
             eventBus.publish(.agentIdle(agentId: agentId))
         } else if state == .active {
             eventBus.publish(.agentActive(agentId: agentId))

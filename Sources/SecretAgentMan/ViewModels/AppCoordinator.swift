@@ -36,7 +36,6 @@ final class AppCoordinator {
         let repositoryMonitor = RepositoryMonitor(store: agentSessions.store)
         let prStore = PRStore(
             store: agentSessions.store,
-            terminalManager: agentSessions.terminalManager,
             eventBus: agentSessions.eventBus,
             repositoryMonitor: repositoryMonitor
         )
@@ -98,10 +97,6 @@ final class AppCoordinator {
         agentSessions.syncSessionWatches()
         usageMonitor.syncWatches()
         usageMonitor.refreshSelectedAgent()
-    }
-
-    func sendPrompt(_ prompt: PendingPrompt) {
-        agentSessions.sendPrompt(prompt)
     }
 
     func ensureCodexSession(for agentId: UUID) {

@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct PRStoreTests {
     @Test
-    func reviewPRCreatesReviewAgentAndPendingPromptWithoutChangingSelection() throws {
+    func reviewPRCreatesReviewAgentWithInitialPromptWithoutChangingSelection() throws {
         let store = AgentStore(loadFromDisk: false)
         let existingAgent = Agent(
             name: "Existing",
@@ -23,14 +23,10 @@ struct PRStoreTests {
 
         #expect(store.agents.count == 2)
         #expect(store.selectedAgentId == existingAgent.id)
-        #expect(store.pendingPrompts.count == 1)
 
         let reviewAgent = try #require(store.agents.last)
-        let pendingPrompt = try #require(store.pendingPrompts.first)
         #expect(reviewAgent.name == "PR #42 - Review")
-        #expect(pendingPrompt.agentId == reviewAgent.id)
-        #expect(pendingPrompt.summary == "Diff review: acme/project #42")
-        #expect(pendingPrompt.fullPrompt.contains("gh pr diff 42 --repo acme/project"))
+        #expect(reviewAgent.initialPrompt?.contains("gh pr diff 42 --repo acme/project") == true)
     }
 
     @Test
@@ -51,7 +47,6 @@ struct PRStoreTests {
         prStore.reviewPR(makePR(repository: "acme/project", number: 7))
 
         #expect(store.agents.count == 1)
-        #expect(store.pendingPrompts.isEmpty)
     }
 
     @Test
@@ -76,7 +71,6 @@ struct PRStoreTests {
         let repositoryMonitor = RepositoryMonitor(store: store)
         return PRStore(
             store: store,
-            terminalManager: TerminalManager(),
             eventBus: AgentEventBus(loadFromDisk: false),
             repositoryMonitor: repositoryMonitor
         )
