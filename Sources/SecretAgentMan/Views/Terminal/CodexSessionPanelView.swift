@@ -9,6 +9,7 @@ struct CodexSessionPanelView: View {
 
     @State private var draft = ""
     @State private var pendingImages: [PendingImage] = []
+    @FocusState private var composerFocused: Bool
 
     private var transcript: [CodexTranscriptItem] {
         coordinator.codexMonitor.transcriptItems[agent.id] ?? []
@@ -96,12 +97,16 @@ struct CodexSessionPanelView: View {
         .onChange(of: agent.id) { _, newId in
             coordinator.ensureCodexSession(for: newId)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .focusComposer)) { _ in
+            composerFocused = true
+        }
     }
 
     private var composer: some View {
         SessionComposer(
             draft: $draft,
             pendingImages: $pendingImages,
+            composerFocused: $composerFocused,
             fontScale: fontScale,
             statusText: composerStatusText,
             statusColor: .secondary,

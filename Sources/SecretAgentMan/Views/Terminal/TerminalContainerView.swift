@@ -11,18 +11,23 @@ import SwiftUI
 struct TerminalContainerView: NSViewRepresentable {
     let selectedAgentId: UUID?
     let terminal: LocalProcessTerminalView?
+    var onEmbed: ((LocalProcessTerminalView) -> Void)?
 
-    func makeNSView(context: Context) -> NSView {
-        let container = NSView(frame: .zero)
+    func makeNSView(context: Context) -> TerminalHostView {
+        let container = TerminalHostView(frame: .zero)
         if let terminal {
             Self.embed(terminal, in: container)
             context.coordinator.currentAgentId = selectedAgentId
             context.coordinator.currentTerminal = terminal
+            container.pendingFocusTerminal = terminal
+            container.onEmbed = onEmbed
         }
         return container
     }
 
-    func updateNSView(_ container: NSView, context: Context) {
+    func updateNSView(_ container: TerminalHostView, context: Context) {
+        container.onEmbed = onEmbed
+
         let newId = selectedAgentId
         let oldId = context.coordinator.currentAgentId
 
@@ -33,6 +38,7 @@ struct TerminalContainerView: NSViewRepresentable {
                 }
                 context.coordinator.currentAgentId = newId
                 context.coordinator.currentTerminal = nil
+                container.pendingFocusTerminal = nil
             }
             return
         }
@@ -47,6 +53,12 @@ struct TerminalContainerView: NSViewRepresentable {
         context.coordinator.currentTerminal = terminal
 
         Self.embed(terminal, in: container)
+
+        if terminal.window != nil {
+            onEmbed?(terminal)
+        } else {
+            container.pendingFocusTerminal = terminal
+        }
     }
 
     private static func embed(_ terminal: LocalProcessTerminalView, in container: NSView) {
@@ -68,5 +80,20 @@ struct TerminalContainerView: NSViewRepresentable {
     final class Coordinator {
         var currentAgentId: UUID?
         weak var currentTerminal: LocalProcessTerminalView?
+    }
+}
+
+/// NSView subclass that fires the onEmbed callback once the terminal
+/// has a window, solving the first-launch focus timing problem.
+final class TerminalHostView: NSView {
+    var pendingFocusTerminal: LocalProcessTerminalView?
+    var onEmbed: ((LocalProcessTerminalView) -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil, let terminal = pendingFocusTerminal {
+            pendingFocusTerminal = nil
+            onEmbed?(terminal)
+        }
     }
 }
