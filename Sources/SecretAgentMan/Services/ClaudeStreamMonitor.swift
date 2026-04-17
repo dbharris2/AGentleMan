@@ -673,6 +673,11 @@ private final class Observer: @unchecked Sendable {
             args.append(contentsOf: ["--plugin-dir", pluginDir])
         }
 
+        let mcpConfigURL = agent.folder.appendingPathComponent(".mcp.json")
+        if FileManager.default.fileExists(atPath: mcpConfigURL.path) {
+            args.append(contentsOf: ["--mcp-config", mcpConfigURL.path])
+        }
+
         return args
     }
 
