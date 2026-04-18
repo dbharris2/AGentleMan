@@ -94,9 +94,9 @@ struct ChangesView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 3)
-                    .hoverHighlight(isSelected: selectedFile == change.path)
+                    .hoverHighlight(isSelected: selectedFile == change.path, cornerRadius: 0)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if selectedFile == change.path {
@@ -114,7 +114,7 @@ struct ChangesView: View {
                         }
                     }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
+                    .listRowInsets(EdgeInsets())
                 }
             } header: {
                 HStack {

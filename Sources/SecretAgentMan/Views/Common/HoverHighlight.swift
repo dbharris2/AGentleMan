@@ -2,13 +2,14 @@ import SwiftUI
 
 struct HoverHighlight: ViewModifier {
     var isSelected: Bool = false
+    var cornerRadius: CGFloat = 6
     @State private var isHovered = false
     @Environment(\.appTheme) private var theme
 
     func body(content: Content) -> some View {
         content
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(fillColor)
             )
             .onHover { isHovered = $0 }
@@ -22,7 +23,7 @@ struct HoverHighlight: ViewModifier {
 }
 
 extension View {
-    func hoverHighlight(isSelected: Bool = false) -> some View {
-        modifier(HoverHighlight(isSelected: isSelected))
+    func hoverHighlight(isSelected: Bool = false, cornerRadius: CGFloat = 6) -> some View {
+        modifier(HoverHighlight(isSelected: isSelected, cornerRadius: cornerRadius))
     }
 }

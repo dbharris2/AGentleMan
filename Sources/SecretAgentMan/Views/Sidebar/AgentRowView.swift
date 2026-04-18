@@ -37,9 +37,11 @@ struct AgentRowView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
+        .padding(.leading, 28)
+        .padding(.trailing, 12)
         .padding(.vertical, 4)
         .contentShape(Rectangle())
-        .hoverHighlight()
+        .hoverHighlight(isSelected: isSelected, cornerRadius: 0)
     }
 
     private var providerPillColor: Color {

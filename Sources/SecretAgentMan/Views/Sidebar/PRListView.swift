@@ -106,6 +106,8 @@ struct PRListView: View {
                                 isSelected: selectedPRId == pr.id
                             )
                             .contentShape(Rectangle())
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
                             .onTapGesture {
                                 if selectedPRId == pr.id {
                                     actions.select(nil)
@@ -313,8 +315,9 @@ struct PRRowView: View {
                 }
             }
         }
+        .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 4)
-        .hoverHighlight(isSelected: isSelected)
+        .hoverHighlight(isSelected: isSelected, cornerRadius: 0)
     }
 }

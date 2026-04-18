@@ -22,12 +22,14 @@ struct SkillsPopover: View {
             Text("Skills")
                 .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
             Divider()
 
             if skills.isEmpty {
                 Text("No skills available")
                     .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -40,6 +42,7 @@ struct SkillsPopover: View {
                                         .scaledFont(size: 11, weight: .medium)
                                 }
                                 .foregroundStyle(.secondary)
+                                .padding(.horizontal, 10)
                                 .padding(.bottom, 2)
 
                                 ForEach(group.skills) { skill in
@@ -52,7 +55,7 @@ struct SkillsPopover: View {
                 .frame(maxHeight: 300)
             }
         }
-        .padding(10)
+        .padding(.vertical, 10)
         .frame(minWidth: 240, maxWidth: 360)
     }
 }
@@ -81,8 +84,10 @@ private struct SkillRow: View {
                     .scaledFont(size: 9)
                     .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 2)
             .contentShape(Rectangle())
-            .hoverHighlight()
+            .hoverHighlight(cornerRadius: 0)
         }
         .buttonStyle(.plain)
     }

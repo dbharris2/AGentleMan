@@ -295,18 +295,20 @@ struct StatusBarView: View {
             Text(title)
                 .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
             Divider()
             if items.isEmpty {
                 Text(emptyMessage)
                     .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
             } else {
                 ForEach(items, id: \.self) { item in
                     PopoverRow(label: item)
                 }
             }
         }
-        .padding(10)
+        .padding(.vertical, 10)
         .frame(minWidth: 180)
     }
 
@@ -368,6 +370,7 @@ private struct SessionPopover: View {
             Text("Sessions")
                 .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
 
             Divider()
 
@@ -379,6 +382,7 @@ private struct SessionPopover: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+            .padding(.horizontal, 10)
 
             Divider()
 
@@ -398,6 +402,7 @@ private struct SessionPopover: View {
                 Text("No saved sessions found for this folder")
                     .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -418,7 +423,7 @@ private struct SessionPopover: View {
                 .frame(maxHeight: 300)
             }
         }
-        .padding(10)
+        .padding(.vertical, 10)
         .frame(minWidth: 320)
     }
 }
@@ -447,9 +452,10 @@ private struct SessionActionRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .hoverHighlight()
+        .hoverHighlight(cornerRadius: 0)
     }
 
     private static func relativeDate(_ date: Date) -> String {
@@ -476,8 +482,10 @@ private struct PopoverRow: View {
             Text(label)
                 .scaledFont(size: 12)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .hoverHighlight()
+        .hoverHighlight(cornerRadius: 0)
     }
 }
 
