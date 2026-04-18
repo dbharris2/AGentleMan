@@ -49,6 +49,7 @@ final class ClaudeStreamMonitor {
     private(set) var permissionModes: [UUID: String] = [:]
 
     static let permissionModes = ["default", "acceptEdits", "plan", "auto", "bypassPermissions"]
+    static let defaultPermissionMode = permissionModes[0]
 
     @ObservationIgnored private var observers: [UUID: Observer] = [:]
 
@@ -953,15 +954,6 @@ private final class Observer: @unchecked Sendable {
 
         if let commands = inner["commands"] as? [[String: Any]] {
             delegate.slashCommands(commands)
-        }
-
-        // Extract default model display name from initialize response
-        if let models = inner["models"] as? [[String: Any]] {
-            let defaultModel = models.first { ($0["displayName"] as? String)?.contains("Default") == true }
-                ?? models.first
-            if let name = defaultModel?["displayName"] as? String {
-                delegate.modelInfo(agent.id, name, 0)
-            }
         }
     }
 
