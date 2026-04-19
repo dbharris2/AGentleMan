@@ -27,10 +27,13 @@ struct PlanListView: View {
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
                     .padding(.top, 6)
                     .padding(.bottom, 4)
                     .contentShape(Rectangle())
-                    .hoverHighlight(isSelected: selectedPlanURL == plan.url)
+                    .hoverHighlight(isSelected: selectedPlanURL == plan.url, cornerRadius: 0)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                     .onTapGesture {
                         if selectedPlanURL == plan.url {
                             selectedPlanURL = nil

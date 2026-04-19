@@ -98,6 +98,8 @@ struct IssueListView: View {
                                 isSelected: selectedIssueId == issue.id
                             )
                             .contentShape(Rectangle())
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
                             .onTapGesture {
                                 if selectedIssueId == issue.id {
                                     onSelect(nil)
@@ -252,8 +254,9 @@ struct IssueRowView: View {
                 }
             }
         }
+        .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 4)
-        .hoverHighlight(isSelected: isSelected)
+        .hoverHighlight(isSelected: isSelected, cornerRadius: 0)
     }
 }

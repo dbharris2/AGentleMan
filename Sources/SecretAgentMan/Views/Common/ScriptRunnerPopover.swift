@@ -17,12 +17,14 @@ struct ScriptRunnerPopover: View {
             Text("Scripts")
                 .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
             Divider()
 
             if scripts.isEmpty {
                 Text("No scripts detected")
                     .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -35,6 +37,7 @@ struct ScriptRunnerPopover: View {
                                         .scaledFont(size: 11, weight: .medium)
                                 }
                                 .foregroundStyle(.secondary)
+                                .padding(.horizontal, 10)
                                 .padding(.bottom, 2)
 
                                 ForEach(group.scripts) { script in
@@ -47,7 +50,7 @@ struct ScriptRunnerPopover: View {
                 .frame(maxHeight: 300)
             }
         }
-        .padding(10)
+        .padding(.vertical, 10)
         .frame(minWidth: 200)
     }
 }
@@ -68,8 +71,10 @@ private struct ScriptRow: View {
                     .scaledFont(size: 9)
                     .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 2)
             .contentShape(Rectangle())
-            .hoverHighlight()
+            .hoverHighlight(cornerRadius: 0)
         }
         .buttonStyle(.plain)
     }
