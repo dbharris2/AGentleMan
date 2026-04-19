@@ -15,12 +15,12 @@ struct IssueDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.xxl) {
+                VStack(alignment: .leading, spacing: Spacing.md) {
                     Text(issue.title)
                         .scaledFont(size: 16, weight: .semibold)
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.lg) {
                         Text(verbatim: "\(issue.repository) #\(issue.number)")
                             .scaledFont(size: 12)
                             .foregroundStyle(.secondary)
@@ -48,12 +48,12 @@ struct IssueDetailView: View {
                     }
 
                     if !issue.labels.isEmpty {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.sm) {
                             ForEach(issue.labels, id: \.name) { label in
                                 Text(label.name)
                                     .scaledFont(size: 10)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
+                                    .padding(.horizontal, Spacing.md)
+                                    .padding(.vertical, Spacing.xs)
                                     .background(Color(hex: label.color).opacity(0.3))
                                     .foregroundStyle(Color(hex: label.color))
                                     .clipShape(Capsule())
@@ -86,8 +86,8 @@ struct IssueDetailView: View {
                         .foregroundStyle(.secondary)
 
                     ForEach(comments) { comment in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            HStack(spacing: Spacing.md) {
                                 if let avatarURL = comment.authorAvatarURL {
                                     AsyncImage(url: avatarURL) { image in
                                         image.resizable()
@@ -113,7 +113,7 @@ struct IssueDetailView: View {
                                 .scaledFont(size: 12, design: .monospaced)
                                 .textSelection(.enabled)
                         }
-                        .padding(8)
+                        .padding(Spacing.lg)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(theme.foreground.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -129,7 +129,7 @@ struct IssueDetailView: View {
                     }
                 }
             }
-            .padding(16)
+            .padding(Spacing.xxxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(theme.background)

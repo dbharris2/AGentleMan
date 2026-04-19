@@ -29,7 +29,7 @@ struct IssueListView: View {
                     Text("Loading issues…")
                         .scaledFont(size: 12)
                         .foregroundStyle(.secondary)
-                        .padding(.top, 4)
+                        .padding(.top, Spacing.sm)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
@@ -57,7 +57,7 @@ struct IssueListView: View {
         let fraction = limit.limit > 0 ? Double(limit.used) / Double(limit.limit) : 0
         let color: Color = fraction > 0.8 ? theme.red : fraction > 0.5 ? theme.yellow : theme.green
 
-        return HStack(spacing: 6) {
+        return HStack(spacing: Spacing.md) {
             Circle()
                 .fill(color)
                 .frame(width: 6, height: 6)
@@ -73,8 +73,8 @@ struct IssueListView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Spacing.xxl)
+        .padding(.vertical, Spacing.sm)
         .background(theme.surface)
     }
 
@@ -147,7 +147,7 @@ struct IssueListView: View {
                                 .background(sectionColor(item.section))
                                 .clipShape(Capsule())
                         }
-                        .padding(.trailing, 8)
+                        .padding(.trailing, Spacing.lg)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -158,7 +158,7 @@ struct IssueListView: View {
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(theme.surface)
-        .padding(.top, 8)
+        .padding(.top, Spacing.lg)
     }
 
     private func sectionColor(_ section: IssueSection) -> Color {
@@ -187,7 +187,7 @@ struct IssueRowView: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: Spacing.lg) {
             RoundedRectangle(cornerRadius: 1.5)
                 .fill(theme.green)
                 .frame(width: 3)
@@ -206,7 +206,7 @@ struct IssueRowView: View {
                 .help(issue.authorLogin)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 HStack {
                     Text(issue.title)
                         .scaledFont(size: 12)
@@ -219,7 +219,7 @@ struct IssueRowView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.md) {
                     Text(verbatim: "\(issue.repository) #\(issue.number)")
                         .scaledFont(size: 10)
                         .foregroundStyle(.secondary)
@@ -227,7 +227,7 @@ struct IssueRowView: View {
                     ForEach(Array(issue.labels.prefix(3)), id: \.name) { label in
                         Text(label.name)
                             .scaledFont(size: 9)
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, Spacing.sm)
                             .padding(.vertical, 1)
                             .background(Color(hex: label.color).opacity(0.3))
                             .foregroundStyle(Color(hex: label.color))
@@ -243,7 +243,7 @@ struct IssueRowView: View {
                     Spacer()
 
                     if issue.commentCount > 0 {
-                        HStack(spacing: 2) {
+                        HStack(spacing: Spacing.xs) {
                             Image(systemName: "bubble.left")
                                 .scaledFont(size: 9)
                             Text(verbatim: "\(issue.commentCount)")
@@ -254,9 +254,9 @@ struct IssueRowView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
+        .padding(.horizontal, Spacing.xxl)
+        .padding(.top, Spacing.md)
+        .padding(.bottom, Spacing.sm)
         .hoverHighlight(isSelected: isSelected, cornerRadius: 0)
     }
 }

@@ -115,7 +115,7 @@ struct ClaudeSessionPanelView: View {
                             draft = "/\(command.name) "
                             slashSelectionIndex = 0
                         } label: {
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .top, spacing: Spacing.lg) {
                                 Text("/\(command.name)")
                                     .scaledFont(size: 13, weight: .medium, design: .monospaced)
                                     .frame(width: 140, alignment: .leading)
@@ -128,8 +128,8 @@ struct ClaudeSessionPanelView: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, Spacing.xxl)
+                            .padding(.vertical, Spacing.md)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)

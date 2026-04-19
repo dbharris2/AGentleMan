@@ -25,7 +25,7 @@ struct VersionBadgeView: View {
 
     var body: some View {
         Link(destination: releasesURL) {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.sm) {
                 if isDebug {
                     Text("DEBUG")
                         .scaledFont(size: 11, weight: .bold, design: .monospaced)

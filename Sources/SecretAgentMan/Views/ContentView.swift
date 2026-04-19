@@ -133,7 +133,7 @@ struct ContentView: View {
                     ClaudeSessionPanelView(agent: agent)
                 }
             } else {
-                VStack(spacing: 8) {
+                VStack(spacing: Spacing.lg) {
                     Image(systemName: "sparkle")
                         .scaledFont(size: 28)
                         .foregroundStyle(.secondary)

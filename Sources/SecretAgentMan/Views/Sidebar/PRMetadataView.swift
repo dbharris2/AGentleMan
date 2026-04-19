@@ -5,7 +5,7 @@ struct PRMetadataView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.sm) {
             RoundedRectangle(cornerRadius: 1)
                 .fill(prInfo.state.tone.color(in: theme))
                 .frame(width: 3, height: 14)

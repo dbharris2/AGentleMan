@@ -36,7 +36,7 @@ struct SessionChatView: View {
             let scrollToBottom = { proxy.scrollTo("bottom", anchor: .bottom) }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Spacing.xxl) {
                     if transcript.isEmpty, streaming == nil {
                         Text(emptyStateText)
                             .scaledFont(size: 13)
@@ -57,7 +57,7 @@ struct SessionChatView: View {
                                     .scaledFont(size: 12)
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 6)
+                                    .padding(.vertical, Spacing.md)
                             }
                             .buttonStyle(.plain)
                         }
@@ -88,7 +88,7 @@ struct SessionChatView: View {
 
                     Color.clear.frame(height: 1).id("bottom")
                 }
-                .padding(12)
+                .padding(Spacing.xxl)
             }
             .onAppear {
                 visibleCount = Self.pageSize
@@ -105,7 +105,7 @@ struct SessionChatView: View {
     private func systemGroupView(items: [CodexTranscriptItem], groupId: String) -> some View {
         let isExpanded = expandedGroups.contains(groupId)
 
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     if isExpanded {
@@ -115,7 +115,7 @@ struct SessionChatView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.md) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .scaledFont(size: 10)
                         .foregroundStyle(.secondary)
@@ -140,7 +140,7 @@ struct SessionChatView: View {
             .buttonStyle(.plain)
 
             if isExpanded {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Spacing.md) {
                     ForEach(mergedExpandedSystemItems(items: items), id: \.id) { item in
                         SessionMarkdownText(text: item.displayText, fontScale: fontScale)
                             .padding(.leading, 18)

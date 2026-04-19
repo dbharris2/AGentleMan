@@ -28,7 +28,7 @@ struct DiffView: View {
                     diffLine(entry.line, kind: entry.kind, lang: entry.lang)
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.sm)
         }
         .background(theme.background)
         .textSelection(.enabled)
@@ -45,9 +45,9 @@ struct DiffView: View {
             Text(line)
                 .scaledFont(size: 12, weight: .bold, design: .monospaced)
                 .foregroundStyle(theme.foreground)
-                .padding(.horizontal, 8)
-                .padding(.top, 12)
-                .padding(.bottom, 2)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.top, Spacing.xxl)
+                .padding(.bottom, Spacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.foreground.opacity(0.08))
 
@@ -55,32 +55,32 @@ struct DiffView: View {
             Text(line)
                 .scaledFont(size: 12, design: .monospaced)
                 .foregroundStyle(theme.cyan)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.cyan.opacity(0.06))
 
         case .added:
             highlightedText(line, prefix: "+", lang: lang, fallbackColor: theme.green)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Spacing.lg)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.green.opacity(0.1))
 
         case .removed:
             highlightedText(line, prefix: "-", lang: lang, fallbackColor: theme.red)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Spacing.lg)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.red.opacity(0.1))
 
         case .context:
             highlightedText(line, prefix: " ", lang: lang, fallbackColor: theme.foreground.opacity(0.6))
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Spacing.lg)
 
         case .meta:
             Text(line)
                 .scaledFont(size: 11, design: .monospaced)
                 .foregroundStyle(theme.foreground.opacity(0.6))
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Spacing.lg)
         }
     }
 

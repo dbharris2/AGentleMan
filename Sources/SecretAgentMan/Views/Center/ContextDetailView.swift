@@ -20,7 +20,7 @@ struct ContextDetailView: View {
             if coordinator.prStore.selectedPRChanges.isEmpty, !coordinator.prStore.selectedPRDiff.isEmpty {
                 ChangesView(changes: coordinator.prStore.selectedPRChanges, fullDiff: coordinator.prStore.selectedPRDiff)
             } else if coordinator.prStore.selectedPRChanges.isEmpty {
-                VStack(spacing: 8) {
+                VStack(spacing: Spacing.lg) {
                     ProgressView()
                     Text("Loading diff for #\(pr.number)...")
                         .scaledFont(size: 13)
