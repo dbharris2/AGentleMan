@@ -33,8 +33,8 @@ struct ChangesView: View {
                         }
                         .pickerStyle(.segmented)
                         .frame(width: 80)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, Spacing.lg)
+                        .padding(.vertical, Spacing.sm)
                     }
                     .background(theme.surface)
                 }
@@ -68,7 +68,7 @@ struct ChangesView: View {
         List {
             Section {
                 ForEach(changes) { change in
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.lg) {
                         Text(change.status.label)
                             .scaledFont(size: 11, weight: .medium, design: .monospaced)
                             .foregroundStyle(statusColor(change.status, theme: theme))
@@ -81,7 +81,7 @@ struct ChangesView: View {
 
                         Spacer()
 
-                        HStack(spacing: 6) {
+                        HStack(spacing: Spacing.md) {
                             if change.insertions > 0 {
                                 Text("+\(change.insertions)")
                                     .scaledFont(size: 11, weight: .medium, design: .monospaced)
@@ -94,7 +94,7 @@ struct ChangesView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, Spacing.xl)
                     .padding(.vertical, 3)
                     .hoverHighlight(isSelected: selectedFile == change.path, cornerRadius: 0)
                     .contentShape(Rectangle())

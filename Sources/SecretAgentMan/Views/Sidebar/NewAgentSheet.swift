@@ -12,7 +12,7 @@ struct NewAgentSheet: View {
     @State private var initialPrompt = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.xxxl) {
             Text("New Agent")
                 .font(.headline)
 

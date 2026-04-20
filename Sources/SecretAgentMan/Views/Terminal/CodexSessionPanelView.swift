@@ -66,7 +66,7 @@ struct CodexSessionPanelView: View {
                             .scaledFont(size: 12)
                             .foregroundStyle(theme.yellow)
                             .textSelection(.enabled)
-                            .padding(12)
+                            .padding(Spacing.xxl)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(theme.yellow.opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -195,7 +195,7 @@ struct CodexSessionPanelView: View {
     }
 
     private func inputCard(_ request: CodexUserInputRequest) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.xl) {
             ForEach(request.questions) { question in
                 SessionQuestionCard(
                     title: question.header,

@@ -6,7 +6,7 @@ struct AgentRowView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.lg) {
             StatusBadge(state: agent.state)
 
             HStack(spacing: 5) {
@@ -31,8 +31,8 @@ struct AgentRowView: View {
                 .lineLimit(1)
         }
         .padding(.leading, 28)
-        .padding(.trailing, 12)
-        .padding(.vertical, 4)
+        .padding(.trailing, Spacing.xxl)
+        .padding(.vertical, Spacing.sm)
         .contentShape(Rectangle())
         .hoverHighlight(isSelected: isSelected, cornerRadius: 0)
     }

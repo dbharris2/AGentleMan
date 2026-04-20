@@ -34,7 +34,7 @@ struct GeneralSettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.xxl) {
             Section {
                 Text("Default Agent Folder")
                     .font(.headline)
@@ -100,7 +100,7 @@ struct GeneralSettingsView: View {
                     Text(policy.settingsDescription)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.sm) {
                     Text("Configuration is read from ~/.codex/config.toml")
                     Text("Plugins and MCP servers are discovered from ~/.codex")
                     Text("Approval policy is applied to new Codex turns and future session starts.")
@@ -114,9 +114,9 @@ struct GeneralSettingsView: View {
             Text("App Theme")
                 .font(.headline)
 
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.xxl) {
                 ThemePreviewLarge(themeName: selectedTheme)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text(selectedTheme)
                         .scaledFont(size: 14, weight: .semibold)
                     Text("Current theme")
@@ -125,7 +125,7 @@ struct GeneralSettingsView: View {
                 }
                 Spacer()
             }
-            .padding(10)
+            .padding(Spacing.xl)
             .background(Color.accentColor.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
@@ -174,7 +174,7 @@ struct ThemePreviewLarge: View {
     let themeName: String
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: Spacing.xs) {
             if let theme = GhosttyThemeLoader.load(named: themeName) {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color(nsColor: theme.background))
@@ -248,7 +248,7 @@ struct ReviewerGroupsSettingsView: View {
 
                 Divider()
 
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.sm) {
                     Button(action: addGroup) {
                         Image(systemName: "plus")
                     }
@@ -257,13 +257,13 @@ struct ReviewerGroupsSettingsView: View {
                     }
                     .disabled(selectedGroupId == nil)
                 }
-                .padding(6)
+                .padding(Spacing.md)
             }
             .frame(minWidth: 140, idealWidth: 160)
 
             // Group detail
             if let index = store.groups.firstIndex(where: { $0.id == selectedGroupId }) {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Spacing.xxl) {
                     TextField("Group Name", text: $store.groups[index].name)
                         .textFieldStyle(.roundedBorder)
                         .font(.headline)
@@ -299,7 +299,7 @@ struct ReviewerGroupsSettingsView: View {
                             .disabled(newReviewerText.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
-                .padding(12)
+                .padding(Spacing.xxl)
             } else {
                 VStack {
                     Spacer()
@@ -310,7 +310,7 @@ struct ReviewerGroupsSettingsView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .padding(12)
+        .padding(Spacing.xxl)
     }
 
     private func addGroup() {

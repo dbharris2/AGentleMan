@@ -16,7 +16,7 @@ struct PlanListView: View {
                 )
             } else {
                 List(plans) { plan in
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
                         Text(plan.title)
                             .scaledFont(size: 13)
                             .lineLimit(1)
@@ -27,9 +27,9 @@ struct PlanListView: View {
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 6)
-                    .padding(.bottom, 4)
+                    .padding(.horizontal, Spacing.xxl)
+                    .padding(.top, Spacing.md)
+                    .padding(.bottom, Spacing.sm)
                     .contentShape(Rectangle())
                     .hoverHighlight(isSelected: selectedPlanURL == plan.url, cornerRadius: 0)
                     .listRowInsets(EdgeInsets())

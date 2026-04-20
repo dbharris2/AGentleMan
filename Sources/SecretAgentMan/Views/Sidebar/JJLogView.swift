@@ -29,7 +29,7 @@ struct JJLogView: View {
                         .font(.system(size: 12, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .padding(12)
+                        .padding(Spacing.xxl)
                 }
             }
         }

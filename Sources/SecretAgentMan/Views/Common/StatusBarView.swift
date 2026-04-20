@@ -51,14 +51,14 @@ struct StatusBarView: View {
         let skills = skills
         let sessions = sessions
 
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.lg) {
             AgentStatusSummary(agents: coordinator.store.agents)
 
             Divider()
                 .frame(height: 16)
 
             // Left: navigation toggles
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.lg) {
                 panelToggleButton(icon: "doc.text", panel: .plans, label: "Plans")
                 panelToggleImageButton(image: "PRIcon", panel: .prs, label: "Pull Requests")
                 panelToggleButton(icon: "exclamationmark.circle", panel: .issues, label: "Issues")
@@ -72,7 +72,7 @@ struct StatusBarView: View {
                 .frame(height: 16)
 
             // Center-left: per-agent context
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.xl) {
                 popoverButton(isPresented: $showingMCPPopover, help: "MCP Servers") {
                     HStack(spacing: 3) {
                         Image(systemName: "server.rack")
@@ -156,10 +156,10 @@ struct StatusBarView: View {
 
             Divider()
                 .frame(height: 16)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Spacing.lg)
 
             if let agent = selectedAgent {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.lg) {
                     if agent.provider == .codex,
                        let limits = coordinator.usageMonitor.rateLimits[agent.provider] {
                         popoverButton(isPresented: $showingUsagePopover, help: "API Usage") {
@@ -211,16 +211,16 @@ struct StatusBarView: View {
                         }
                     }
                 }
-                .padding(.trailing, 8)
+                .padding(.trailing, Spacing.lg)
             }
 
             Divider()
                 .frame(height: 16)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, Spacing.sm)
 
             VersionBadgeView()
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, Spacing.xl)
         .frame(height: 26)
         .background(theme.surface)
     }
@@ -239,7 +239,7 @@ struct StatusBarView: View {
         Button {
             coordinator.activeSidebarPanel = coordinator.activeSidebarPanel == panel ? nil : panel
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.sm) {
                 Image(systemName: icon)
                     .scaledFont(size: 11)
                 Text(label)
@@ -259,7 +259,7 @@ struct StatusBarView: View {
         Button {
             coordinator.activeSidebarPanel = coordinator.activeSidebarPanel == panel ? nil : panel
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.sm) {
                 Image(image)
                     .resizable()
                     .frame(width: 12, height: 12)
@@ -291,24 +291,24 @@ struct StatusBarView: View {
     }
 
     private func popoverList(title: String, items: [String], emptyMessage: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             Text(title)
                 .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Spacing.xl)
             Divider()
             if items.isEmpty {
                 Text(emptyMessage)
                     .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, Spacing.xl)
             } else {
                 ForEach(items, id: \.self) { item in
                     PopoverRow(label: item)
                 }
             }
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, Spacing.xl)
         .frame(minWidth: 180)
     }
 
@@ -322,7 +322,7 @@ struct StatusBarView: View {
 private extension View {
     func statusBarPill(isSelected: Bool) -> some View {
         self
-            .padding(.horizontal, 6)
+            .padding(.horizontal, Spacing.md)
             .padding(.vertical, 3)
             .hoverHighlight(isSelected: isSelected)
     }
@@ -337,7 +337,7 @@ private struct AgentStatusSummary: View {
     ]
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.lg) {
             ForEach(Self.trackedStates, id: \.self) { state in
                 indicator(for: state)
             }
@@ -366,15 +366,15 @@ private struct SessionPopover: View {
     let onStartNew: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Text("Sessions")
                 .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Spacing.xl)
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(agent.name)
                     .scaledFont(size: 12, weight: .medium)
                 Text(agent.folderPath)
@@ -382,7 +382,7 @@ private struct SessionPopover: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, Spacing.xl)
 
             Divider()
 
@@ -402,7 +402,7 @@ private struct SessionPopover: View {
                 Text("No saved sessions found for this folder")
                     .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, Spacing.xl)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -423,7 +423,7 @@ private struct SessionPopover: View {
                 .frame(maxHeight: 300)
             }
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, Spacing.xl)
         .frame(minWidth: 320)
     }
 }
@@ -434,7 +434,7 @@ private struct SessionActionRow: View {
     var timestamp: Date?
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.lg) {
             Image(systemName: icon)
                 .scaledFont(size: 12)
                 .foregroundStyle(.secondary)
@@ -452,8 +452,8 @@ private struct SessionActionRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Spacing.xl)
+        .padding(.vertical, Spacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .hoverHighlight(cornerRadius: 0)
     }
@@ -475,15 +475,15 @@ private struct PopoverRow: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Spacing.md) {
             Circle()
                 .fill(theme.green)
                 .frame(width: 6, height: 6)
             Text(label)
                 .scaledFont(size: 12)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 2)
+        .padding(.horizontal, Spacing.xl)
+        .padding(.vertical, Spacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
         .hoverHighlight(cornerRadius: 0)
     }
@@ -507,7 +507,7 @@ private struct UsagePopover: View {
     }()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Text("API Usage — \(provider.displayName)")
                 .scaledFont(size: 12, weight: .semibold)
                 .foregroundStyle(.secondary)
@@ -517,7 +517,7 @@ private struct UsagePopover: View {
             usageRow(limits.shortWindow)
             usageRow(limits.longWindow)
         }
-        .padding(10)
+        .padding(Spacing.xl)
         .frame(minWidth: 200)
     }
 

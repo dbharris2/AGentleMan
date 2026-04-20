@@ -18,9 +18,9 @@ struct SideBySideDiffView: View {
                         Text(text)
                             .scaledFont(size: 12, weight: .bold, design: .monospaced)
                             .foregroundStyle(theme.foreground)
-                            .padding(.horizontal, 8)
-                            .padding(.top, 12)
-                            .padding(.bottom, 2)
+                            .padding(.horizontal, Spacing.lg)
+                            .padding(.top, Spacing.xxl)
+                            .padding(.bottom, Spacing.xs)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(theme.foreground.opacity(0.08))
 
@@ -28,8 +28,8 @@ struct SideBySideDiffView: View {
                         Text(text)
                             .scaledFont(size: 12, design: .monospaced)
                             .foregroundStyle(theme.cyan)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, Spacing.lg)
+                            .padding(.vertical, Spacing.xs)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(theme.cyan.opacity(0.06))
 
@@ -42,7 +42,7 @@ struct SideBySideDiffView: View {
                     }
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.sm)
         }
         .background(theme.background)
         .textSelection(.enabled)
@@ -66,18 +66,18 @@ struct SideBySideDiffView: View {
         if cell.kind == .empty {
             Text(" ")
                 .scaledFont(size: 12, design: .monospaced)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, Spacing.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else if let highlighted = SyntaxHighlighter.highlight(cell.text, language: lang, fontSize: 12 * fontScale) {
             Text(highlighted)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, Spacing.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(bgColor)
         } else {
             Text(cell.text.isEmpty ? " " : cell.text)
                 .scaledFont(size: 12, design: .monospaced)
                 .foregroundStyle(fallbackColor)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, Spacing.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(bgColor)
         }

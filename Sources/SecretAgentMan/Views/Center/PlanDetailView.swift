@@ -20,7 +20,7 @@ struct PlanDetailView: View {
                 }
                 .foregroundStyle(theme.foreground)
                 .textSelection(.enabled)
-                .padding(16)
+                .padding(Spacing.xxxl)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(theme.background)

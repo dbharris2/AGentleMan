@@ -46,7 +46,7 @@ struct SidebarView: View {
             newAgentPrefillFolder = nil
             showingNewAgent = true
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.xl) {
                 Image(systemName: "square.and.pencil")
                     .scaledFont(size: 13)
                     .foregroundStyle(theme.accent)
@@ -56,8 +56,8 @@ struct SidebarView: View {
                     .foregroundStyle(theme.foreground)
                 Spacer()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, Spacing.xxl)
+            .padding(.vertical, Spacing.lg)
             .contentShape(Rectangle())
             .hoverHighlight(cornerRadius: 0)
         }
@@ -71,13 +71,13 @@ struct SidebarView: View {
             ForEach(groupedAgents, id: \.folder) { group in
                 let isExpanded = folderExpandedBinding(for: group.folder, in: collapsedSet)
 
-                HStack(spacing: 10) {
+                HStack(spacing: Spacing.xl) {
                     Image(systemName: isExpanded.wrappedValue ? "folder.fill" : "folder")
                         .scaledFont(size: 13)
                         .foregroundStyle(theme.accent)
                         .frame(width: 16)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
                         Text(group.agents.first?.folderName ?? "")
                             .scaledFont(size: 13, weight: .bold)
                             .foregroundStyle(theme.foreground)
@@ -105,8 +105,8 @@ struct SidebarView: View {
                     .menuIndicator(.hidden)
                     .fixedSize()
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, Spacing.xxl)
+                .padding(.vertical, Spacing.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .hoverHighlight(cornerRadius: 0)

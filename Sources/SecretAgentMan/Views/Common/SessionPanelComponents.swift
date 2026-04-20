@@ -46,9 +46,9 @@ struct SessionTranscriptBubble: View {
             HStack {
                 Spacer(minLength: 40)
 
-                VStack(alignment: .trailing, spacing: 8) {
+                VStack(alignment: .trailing, spacing: Spacing.lg) {
                     if !images.isEmpty {
-                        HStack(spacing: 6) {
+                        HStack(spacing: Spacing.md) {
                             ForEach(Array(images.enumerated()), id: \.offset) { _, data in
                                 if let nsImage = NSImage(data: data) {
                                     Image(nsImage: nsImage)
@@ -64,13 +64,13 @@ struct SessionTranscriptBubble: View {
 
                     SessionMarkdownText(text: text, fontScale: fontScale)
                 }
-                .padding(12)
+                .padding(Spacing.xxl)
                 .background(SessionPanelTheme.backgroundColor(for: role, in: theme))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         } else {
             // Assistant/system messages: no bubble, just text
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.md) {
                 SessionMarkdownText(text: text, fontScale: fontScale)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -98,7 +98,7 @@ struct SessionApprovalCard: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.xl) {
             Text(title)
                 .scaledFont(size: 12, weight: .semibold)
 
@@ -109,7 +109,7 @@ struct SessionApprovalCard: View {
             }
 
             if supportsDecisions {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.lg) {
                     Button(declineTitle, action: onDecline)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -139,7 +139,7 @@ struct SessionApprovalCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(12)
+        .padding(Spacing.xxl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.yellow.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -152,12 +152,12 @@ struct SessionLiveToolCard: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.xl) {
+            HStack(spacing: Spacing.lg) {
                 Text("Live")
                     .scaledFont(size: 10, weight: .semibold)
                     .foregroundStyle(theme.blue)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, Spacing.md)
                     .padding(.vertical, 3)
                     .background(theme.blue.opacity(0.12))
                     .clipShape(Capsule())
@@ -173,11 +173,11 @@ struct SessionLiveToolCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(minHeight: 120, maxHeight: 220)
-            .padding(8)
+            .padding(Spacing.lg)
             .background(theme.background.opacity(0.45))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .padding(12)
+        .padding(Spacing.xxl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.blue.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -191,8 +191,8 @@ struct SessionElicitationCard: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            HStack(spacing: Spacing.md) {
                 Image(systemName: "questionmark.circle.fill")
                     .foregroundStyle(theme.blue)
                 Text("Response Required")
@@ -210,7 +210,7 @@ struct SessionElicitationCard: View {
                     .scaledFont(size: 11)
                     .foregroundStyle(.secondary)
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.lg) {
                     ForEach(options) { option in
                         Button(option.label) {
                             onSelectOption?(option.label)
@@ -226,7 +226,7 @@ struct SessionElicitationCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(12)
+        .padding(Spacing.xxl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.blue.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -241,7 +241,7 @@ struct SessionQuestionCard: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.xl) {
             if !title.isEmpty {
                 Text(title)
                     .scaledFont(size: 12, weight: .semibold)
@@ -253,7 +253,7 @@ struct SessionQuestionCard: View {
                     .textSelection(.enabled)
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.lg) {
                 ForEach(options) { option in
                     Button(option.label) {
                         onSelect(option)
@@ -264,7 +264,7 @@ struct SessionQuestionCard: View {
                 }
             }
         }
-        .padding(12)
+        .padding(Spacing.xxl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.blue.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -307,13 +307,13 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             suggestions()
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 TextEditor(text: $draft)
                     .focused(composerFocused)
                     .font(.system(size: 13 * fontScale, design: .monospaced))
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 80, maxHeight: 140)
-                    .padding(8)
+                    .padding(Spacing.lg)
                     .background(theme.background)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .onKeyPress(phases: .down) { keyPress in
@@ -329,12 +329,12 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
 
                 if !pendingImages.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: Spacing.lg) {
                             ForEach(pendingImages) { img in
                                 pendingImageThumbnail(img)
                             }
                         }
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, Spacing.lg)
                     }
                 }
 
@@ -355,7 +355,7 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
                     .disabled(sendDisabled)
                 }
             }
-            .padding(12)
+            .padding(Spacing.xxl)
             .background(theme.surface)
         }
     }
@@ -455,7 +455,7 @@ struct SessionThinkingBubble: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.lg) {
             ProgressView()
                 .controlSize(.small)
 
