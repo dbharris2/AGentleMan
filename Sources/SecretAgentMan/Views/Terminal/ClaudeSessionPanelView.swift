@@ -156,9 +156,10 @@ struct ClaudeSessionPanelView: View {
             pendingImages: $pendingImages,
             composerFocused: $composerFocused,
             fontScale: fontScale,
-            statusText: pendingElicitation != nil ? "Answering question..." : composerStatusText,
+            statusText: pendingElicitation != nil ? "Answering question..." : contextUsageLabel,
             statusColor: pendingElicitation != nil ? theme.yellow : .secondary,
             sendDisabled: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingImages.isEmpty,
+            showsSendButton: false,
             onSend: sendDraft,
             onKeyPress: handleComposerKeyPress,
             onDraftChange: { slashSelectionIndex = 0 }
@@ -167,7 +168,16 @@ struct ClaudeSessionPanelView: View {
                 slashCommandList
             }
         } trailingControls: {
-            EmptyView()
+            HStack(spacing: 6) {
+                ClaudeModelPill(
+                    agentId: agent.id,
+                    monitor: coordinator.claudeMonitor
+                )
+                ClaudeModePickerButton(
+                    agentId: agent.id,
+                    monitor: coordinator.claudeMonitor
+                )
+            }
         }
     }
 
@@ -193,10 +203,6 @@ struct ClaudeSessionPanelView: View {
                 return .handled
             }
         }
-        if keyPress.key == .init("m"), keyPress.modifiers.contains(.control) {
-            cyclePermissionMode()
-            return .handled
-        }
         if keyPress.key == .return {
             if keyPress.modifiers.contains(.shift) {
                 return .ignored
@@ -207,23 +213,9 @@ struct ClaudeSessionPanelView: View {
         return .ignored
     }
 
-    private var composerStatusText: String {
-        let monitor = coordinator.claudeMonitor
-        let model = monitor.modelNames[agent.id].flatMap { $0.isEmpty ? nil : $0 } ?? "Claude"
-        let pct = monitor.contextPercentUsed[agent.id] ?? 0
-        let mode = monitor.permissionModes[agent.id] ?? "default"
-        var parts = [model]
-        if pct > 0 { parts.append("\(Int(pct))% ctx") }
-        parts.append("\(mode) (ctrl+m)")
-        return parts.joined(separator: " · ")
-    }
-
-    private func cyclePermissionMode() {
-        let modes = ClaudeStreamMonitor.permissionModes
-        let current = coordinator.claudeMonitor.permissionModes[agent.id] ?? "default"
-        let idx = modes.firstIndex(of: current) ?? 0
-        let next = modes[(idx + 1) % modes.count]
-        coordinator.claudeMonitor.setPermissionMode(for: agent.id, mode: next)
+    private var contextUsageLabel: String {
+        let pct = coordinator.claudeMonitor.contextPercentUsed[agent.id] ?? 0
+        return pct > 0 ? "\(Int(pct))% ctx" : ""
     }
 
     private func sendDraft() {
