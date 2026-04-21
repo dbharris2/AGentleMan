@@ -137,6 +137,19 @@ final class AgentSessionCoordinator {
         store.removeAgent(id: id)
     }
 
+    func removeAgents(in folder: URL) {
+        let folderURL = folder.standardizedFileURL
+        let agentIds = store.agents
+            .filter { $0.folder.standardizedFileURL == folderURL }
+            .map(\.id)
+
+        for id in agentIds {
+            removeAgent(id)
+        }
+
+        syncSessionWatches()
+    }
+
     func ensureCodexSession(for agentId: UUID) {
         guard let agent = store.agents.first(where: { $0.id == agentId }),
               agent.provider == .codex

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SidebarView: View {
@@ -90,9 +91,15 @@ struct SidebarView: View {
                     Spacer()
 
                     Menu {
-                        Button("New Agent in Folder...") {
+                        Button("New agent in folder") {
                             newAgentPrefillFolder = group.agents.first?.folder
                             showingNewAgent = true
+                        }
+                        Divider()
+                        Button("Remove", role: .destructive) {
+                            if let folder = group.agents.first?.folder {
+                                removeFolder(folderURL: folder, folderKey: group.folder)
+                            }
                         }
                     } label: {
                         Image(systemName: "ellipsis")
@@ -118,9 +125,15 @@ struct SidebarView: View {
                     }
                 }
                 .contextMenu {
-                    Button("New Agent in Folder...") {
+                    Button("New agent in folder") {
                         newAgentPrefillFolder = group.agents.first?.folder
                         showingNewAgent = true
+                    }
+                    Divider()
+                    Button("Remove", role: .destructive) {
+                        if let folder = group.agents.first?.folder {
+                            removeFolder(folderURL: folder, folderKey: group.folder)
+                        }
                     }
                 }
 
@@ -136,7 +149,13 @@ struct SidebarView: View {
                             coordinator.store.selectAgent(id: agent.id)
                         }
                         .contextMenu {
-                            Button("Rename...") {
+                            if let sessionId = agent.sessionId {
+                                Button("Copy session id") {
+                                    copyToPasteboard(sessionId)
+                                }
+                                Divider()
+                            }
+                            Button("Rename") {
                                 renameText = agent.name
                                 renamingAgentId = agent.id
                             }
@@ -175,5 +194,18 @@ struct SidebarView: View {
                 collapsedFoldersStorage = updated.sorted().joined(separator: "\n")
             }
         )
+    }
+
+    private func copyToPasteboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func removeFolder(folderURL: URL, folderKey: String) {
+        coordinator.removeFolder(folderURL)
+
+        var updated = collapsedFolders
+        updated.remove(folderKey)
+        collapsedFoldersStorage = updated.sorted().joined(separator: "\n")
     }
 }

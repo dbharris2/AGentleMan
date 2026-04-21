@@ -92,6 +92,11 @@ final class AppCoordinator {
         agentSessions.removeAgent(id)
     }
 
+    func removeFolder(_ folder: URL) {
+        agentSessions.removeAgents(in: folder)
+        syncWatchedAgents()
+    }
+
     func syncWatchedAgents() {
         repositoryMonitor.syncWatchedFolders()
         agentSessions.syncSessionWatches()
