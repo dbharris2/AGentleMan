@@ -44,6 +44,8 @@ struct CodexSessionPanelView: View {
         coordinator.codexMonitor.collaborationModes[agent.id] ?? .default
     }
 
+    @State private var showingUsagePopover = false
+
     var body: some View {
         VStack(spacing: 0) {
             SessionChatView(
@@ -110,7 +112,6 @@ struct CodexSessionPanelView: View {
             fontScale: fontScale,
             statusText: "",
             statusColor: .secondary,
-            sendDisabled: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingImages.isEmpty,
             onSend: sendDraft,
             onKeyPress: handleComposerKeyPress,
             onDraftChange: {}
@@ -130,7 +131,23 @@ struct CodexSessionPanelView: View {
                 ) { mode in
                     coordinator.setCodexCollaborationMode(for: agent.id, mode: mode)
                 }
+                if let limits = coordinator.usageMonitor.rateLimits[.codex] {
+                    usageRingButton(limits: limits)
+                }
             }
+        }
+    }
+
+    private func usageRingButton(limits: AgentRateLimits) -> some View {
+        Button {
+            showingUsagePopover.toggle()
+        } label: {
+            UsageRing(percent: limits.shortWindow.usedPercent)
+        }
+        .buttonStyle(.plain)
+        .help("API Usage")
+        .popover(isPresented: $showingUsagePopover) {
+            UsagePopover(limits: limits, provider: .codex)
         }
     }
 

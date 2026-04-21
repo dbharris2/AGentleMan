@@ -295,8 +295,6 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
     let fontScale: Double
     let statusText: String
     let statusColor: Color
-    let sendDisabled: Bool
-    var showsSendButton: Bool = true
     let onSend: () -> Void
     let onKeyPress: (KeyPress) -> KeyPress.Result
     let onDraftChange: () -> Void
@@ -347,15 +345,6 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
                     Spacer()
 
                     trailingControls()
-
-                    if showsSendButton {
-                        Button("Send") {
-                            onSend()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                        .disabled(sendDisabled)
-                    }
                 }
             }
             .padding(Spacing.xxl)
