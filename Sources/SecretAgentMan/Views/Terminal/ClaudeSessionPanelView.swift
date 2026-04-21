@@ -158,8 +158,6 @@ struct ClaudeSessionPanelView: View {
             fontScale: fontScale,
             statusText: pendingElicitation != nil ? "Answering question..." : "",
             statusColor: pendingElicitation != nil ? theme.yellow : .secondary,
-            sendDisabled: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingImages.isEmpty,
-            showsSendButton: false,
             onSend: sendDraft,
             onKeyPress: handleComposerKeyPress,
             onDraftChange: { slashSelectionIndex = 0 }
