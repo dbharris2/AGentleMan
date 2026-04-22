@@ -196,6 +196,9 @@ final class ClaudeStreamMonitor {
                 // During hydration, check if this is a user-typed message or a tool result.
                 // User-typed messages have "userType" field; tool results don't.
                 if object["userType"] != nil {
+                    // Skip CLI-injected meta messages (slash-command skill bodies, image
+                    // placeholders). Live streaming never surfaces these; hydration shouldn't either.
+                    if object["isMeta"] as? Bool == true { continue }
                     if let message = object["message"] as? [String: Any] {
                         let text: String
                         if let str = message["content"] as? String {
@@ -212,7 +215,7 @@ final class ClaudeStreamMonitor {
                         items.append(CodexTranscriptItem(
                             id: object["uuid"] as? String ?? UUID().uuidString,
                             role: .user,
-                            text: text
+                            text: unwrapSlashCommand(text)
                         ))
                     }
                 } else {
@@ -366,6 +369,33 @@ final class ClaudeStreamMonitor {
         }
 
         return items
+    }
+
+    /// Claude Code rewrites user-typed slash commands into a wrapper like
+    /// `<command-message>foo</command-message><command-name>/foo</command-name><command-args>…</command-args>`
+    /// (element order varies) before writing them to the jsonl transcript. Live
+    /// streaming shows the original typed text; on reload we want to match.
+    nonisolated static func unwrapSlashCommand(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.contains("<command-name>"),
+              let range = trimmed.range(
+                  of: #"<command-name>([^<]+)</command-name>"#,
+                  options: .regularExpression
+              )
+        else { return text }
+        let name = trimmed[range]
+            .replacingOccurrences(of: "<command-name>", with: "")
+            .replacingOccurrences(of: "</command-name>", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let remainder = trimmed
+            .replacingOccurrences(
+                of: #"<command-(?:message|name|args)>[^<]*</command-(?:message|name|args)>"#,
+                with: "",
+                options: .regularExpression
+            )
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, remainder.isEmpty else { return text }
+        return name
     }
 
     private nonisolated static func toolUseSummary(name: String, input: [String: Any]?) -> String {

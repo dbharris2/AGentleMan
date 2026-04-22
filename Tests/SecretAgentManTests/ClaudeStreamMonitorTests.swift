@@ -272,6 +272,43 @@ struct ClaudeStreamMonitorTests {
     }
 
     @Test
+    func hydrateCollapsesSlashCommandWrappersAndSkipsSkillBody() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("claude-hydrate-slash-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let sessionId = "slash-test"
+        // Each line must be standalone JSON — embedded newlines go through as \n escapes.
+        let slashWrapper = #"{"type":"user","uuid":"u1","userType":"external","message":{"role":"user","content":"<command-message>dev:reflect</command-message>\n<command-name>/dev:reflect</command-name>"}}"#
+        let skillBody = #"{"type":"user","uuid":"u2","userType":"external","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"Base directory for this skill: /tmp/reflect\n\n# Reflection body"}]}}"#
+        let followup = #"{"type":"user","uuid":"u3","userType":"external","message":{"role":"user","content":"just a regular follow up"}}"#
+
+        let filePath = dir.appendingPathComponent("\(sessionId).jsonl")
+        try [slashWrapper, skillBody, followup]
+            .joined(separator: "\n")
+            .write(to: filePath, atomically: true, encoding: .utf8)
+
+        let items = ClaudeStreamMonitor.hydrateTranscriptItems(
+            sessionDir: dir, sessionId: sessionId
+        )
+
+        let userItems = items.filter { $0.role == .user }
+        #expect(userItems.count == 2)
+        #expect(userItems[0].text == "/dev:reflect")
+        #expect(userItems[1].text == "just a regular follow up")
+    }
+
+    @Test
+    func unwrapSlashCommandPassesPlainTextThrough() {
+        #expect(ClaudeStreamMonitor.unwrapSlashCommand("hello there") == "hello there")
+        #expect(ClaudeStreamMonitor.unwrapSlashCommand("") == "")
+        // Malformed wrapper with no command-name falls back to the raw text.
+        let malformed = "<command-message>foo</command-message>"
+        #expect(ClaudeStreamMonitor.unwrapSlashCommand(malformed) == malformed)
+    }
+
+    @Test
     func hydrateSkipsNonMessageLines() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("claude-hydrate-skip-\(UUID().uuidString)")
