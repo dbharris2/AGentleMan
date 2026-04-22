@@ -17,9 +17,20 @@ struct PlanListView: View {
             } else {
                 List(plans) { plan in
                     VStack(alignment: .leading, spacing: Spacing.xs) {
-                        Text(plan.title)
-                            .scaledFont(size: 13)
-                            .lineLimit(1)
+                        HStack {
+                            Text(plan.title)
+                                .scaledFont(size: 13)
+                                .lineLimit(1)
+
+                            Spacer()
+
+                            if let modified = plan.modified {
+                                Text(Self.relativeDate(modified))
+                                    .scaledFont(size: 10)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
 
                         Text(plan.filename)
                             .scaledFont(size: 11)
@@ -113,6 +124,17 @@ struct PlanListView: View {
             }
         }
         return nil
+    }
+
+    private static func relativeDate(_ date: Date) -> String {
+        let seconds = Date().timeIntervalSince(date)
+        if seconds < 60 { return "now" }
+        if seconds < 3600 { return "\(Int(seconds / 60))m ago" }
+        if seconds < 86400 { return "\(Int(seconds / 3600))h ago" }
+        if seconds < 604_800 { return "\(Int(seconds / 86400))d ago" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 }
 
