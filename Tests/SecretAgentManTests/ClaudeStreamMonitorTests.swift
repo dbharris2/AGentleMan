@@ -150,7 +150,7 @@ struct ClaudeStreamMonitorTests {
                 ],
             ],
         ])
-        #expect(items.first?.text == "**Bash**: `ls -la`")
+        #expect(items.first?.text == "💻 **Bash**: `ls -la`")
     }
 
     @Test
@@ -163,7 +163,7 @@ struct ClaudeStreamMonitorTests {
                 ],
             ],
         ])
-        #expect(items.first?.text == "**Read**: /tmp/foo.swift")
+        #expect(items.first?.text == "👀 **Read**: /tmp/foo.swift")
     }
 
     @Test
@@ -184,7 +184,7 @@ struct ClaudeStreamMonitorTests {
                 ],
             ],
         ])
-        #expect(items.first?.text == "**Question**: What color?")
+        #expect(items.first?.text == "❓ **Question**: What color?")
     }
 
     @Test
@@ -197,7 +197,7 @@ struct ClaudeStreamMonitorTests {
                 ],
             ],
         ])
-        #expect(items.first?.text == "**ToolSearch**: `select:AskUserQuestion`")
+        #expect(items.first?.text == "🧰 **ToolSearch**: `select:AskUserQuestion`")
     }
 
     @Test
@@ -360,7 +360,7 @@ struct ClaudeStreamMonitorTests {
                 ],
             ],
         ])
-        #expect(items.first?.text == "**Question**: What framework?")
+        #expect(items.first?.text == "❓ **Question**: What framework?")
     }
 
     @Test
@@ -379,6 +379,6 @@ struct ClaudeStreamMonitorTests {
                 ],
             ],
         ])
-        #expect(items.first?.text == "**Question**")
+        #expect(items.first?.text == "❓ **Question**")
     }
 }
