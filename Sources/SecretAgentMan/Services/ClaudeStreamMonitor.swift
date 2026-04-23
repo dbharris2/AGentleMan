@@ -405,53 +405,53 @@ final class ClaudeStreamMonitor {
         case "Bash":
             let cmd = input?["command"] as? String ?? ""
             let truncated = cmd.count > 200 ? String(cmd.prefix(200)) + "…" : cmd
-            return "**Bash**: `\(truncated)`"
+            return "💻 **Bash**: `\(truncated)`"
         case "Read":
             let path = input?["file_path"] as? String ?? ""
-            return "**Read**: \(path)"
+            return "👀 **Read**: \(path)"
         case "Write":
             let path = input?["file_path"] as? String ?? ""
-            return "**Write**: \(path)"
+            return "✏️ **Write**: \(path)"
         case "Edit":
             let path = input?["file_path"] as? String ?? ""
-            return "**Edit**: \(path)"
+            return "📝 **Edit**: \(path)"
         case "Grep":
             let pattern = input?["pattern"] as? String ?? ""
-            return "**Grep**: `\(pattern)`"
+            return "🔍 **Grep**: `\(pattern)`"
         case "Glob":
             let pattern = input?["pattern"] as? String ?? ""
-            return "**Glob**: `\(pattern)`"
+            return "🗂️ **Glob**: `\(pattern)`"
         case "AskUserQuestion":
             if let questions = input?["questions"] as? [[String: Any]],
                let first = questions.first,
                let question = first["question"] as? String {
-                return "**Question**: \(question)"
+                return "❓ **Question**: \(question)"
             }
-            return "**Question**"
+            return "❓ **Question**"
         case "TodoWrite":
             return todoWriteSummary(input: input)
         case "ToolSearch":
             let query = input?["query"] as? String ?? ""
-            return "**ToolSearch**: `\(query)`"
+            return "🧰 **ToolSearch**: `\(query)`"
         case "Agent":
             let desc = input?["description"] as? String ?? ""
-            return "**Agent**: \(desc)"
+            return "🤖 **Agent**: \(desc)"
         case "WebFetch":
             let url = input?["url"] as? String ?? ""
-            return "**WebFetch**: \(url)"
+            return "🌐 **WebFetch**: \(url)"
         case "WebSearch":
             let query = input?["query"] as? String ?? ""
-            return "**WebSearch**: `\(query)`"
+            return "🔎 **WebSearch**: `\(query)`"
         case "TaskCreate", "TaskUpdate":
             let subject = input?["subject"] as? String ?? input?["taskId"] as? String ?? ""
-            return "**\(name)**: \(subject)"
+            return "✨ **\(name)**: \(subject)"
         default:
             if let input, !input.isEmpty {
                 let summary = input.prefix(3).map { "\($0.key): \($0.value)" }.joined(separator: ", ")
                 let truncated = summary.count > 100 ? String(summary.prefix(100)) + "…" : summary
-                return "**\(name)**: \(truncated)"
+                return "⚙️ **\(name)**: \(truncated)"
             }
-            return "**\(name)**"
+            return "⚙️ **\(name)**"
         }
     }
 
