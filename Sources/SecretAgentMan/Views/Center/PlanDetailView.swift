@@ -4,6 +4,7 @@ import SwiftUI
 struct PlanDetailView: View {
     let url: URL
     @State private var content: String = ""
+    @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.appTheme) private var theme
     @Environment(\.fontScale) private var fontScale
 
@@ -26,6 +27,7 @@ struct PlanDetailView: View {
         .background(theme.background)
         .onAppear { loadContent() }
         .onChange(of: url) { loadContent() }
+        .onChange(of: coordinator.planStore.plans) { loadContent() }
     }
 
     private func loadContent() {
