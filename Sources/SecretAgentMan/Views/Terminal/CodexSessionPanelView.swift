@@ -11,19 +11,23 @@ struct CodexSessionPanelView: View {
     @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
+    private var snapshot: AgentSessionSnapshot? {
+        coordinator.agentSessions.snapshots[agent.id]
+    }
+
     private var transcript: [SessionTranscriptItem] {
-        coordinator.agentSessions.snapshots[agent.id]?.transcript ?? []
+        snapshot?.finalizedTranscript ?? []
     }
 
     private var pendingInput: UserInputPrompt? {
-        guard case let .userInput(prompt) = coordinator.agentSessions.snapshots[agent.id]?.activePrompt else {
+        guard case let .userInput(prompt) = snapshot?.activePrompt else {
             return nil
         }
         return prompt
     }
 
     private var pendingApproval: ApprovalPrompt? {
-        guard case let .approval(prompt) = coordinator.agentSessions.snapshots[agent.id]?.activePrompt else {
+        guard case let .approval(prompt) = snapshot?.activePrompt else {
             return nil
         }
         return prompt
@@ -34,7 +38,7 @@ struct CodexSessionPanelView: View {
     }
 
     private var streamingText: String? {
-        coordinator.codexMonitor.streamingText[agent.id]
+        snapshot?.streamingAssistantText
     }
 
     private var isThinking: Bool {
@@ -42,12 +46,12 @@ struct CodexSessionPanelView: View {
     }
 
     private var currentModelName: String {
-        let name = coordinator.agentSessions.snapshots[agent.id]?.metadata.displayModelName
+        let name = snapshot?.metadata.displayModelName
         return (name?.isEmpty == false ? name : nil) ?? "Codex"
     }
 
     private var currentCollaborationMode: CodexCollaborationMode {
-        let raw = coordinator.agentSessions.snapshots[agent.id]?.metadata.collaborationMode
+        let raw = snapshot?.metadata.collaborationMode
         return raw.flatMap(CodexCollaborationMode.init(rawValue:)) ?? .default
     }
 

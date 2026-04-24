@@ -170,3 +170,17 @@ struct AgentSessionSnapshot: Equatable {
     var metadata: SessionMetadataSnapshot = .init()
     var hasUnread: Bool = false
 }
+
+extension AgentSessionSnapshot {
+    /// Text of the most recent still-streaming assistant message, if any.
+    /// Views render this separately from `finalizedTranscript` as a live bubble.
+    var streamingAssistantText: String? {
+        transcript.last { $0.isStreaming }?.text
+    }
+
+    /// Transcript items excluding any still-streaming placeholder.
+    /// Pair with `streamingAssistantText` to avoid rendering the same item twice.
+    var finalizedTranscript: [SessionTranscriptItem] {
+        transcript.filter { !$0.isStreaming }
+    }
+}

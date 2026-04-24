@@ -12,30 +12,34 @@ struct ClaudeSessionPanelView: View {
     @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
+    private var snapshot: AgentSessionSnapshot? {
+        coordinator.agentSessions.snapshots[agent.id]
+    }
+
     private var transcript: [SessionTranscriptItem] {
-        coordinator.agentSessions.snapshots[agent.id]?.transcript ?? []
+        snapshot?.finalizedTranscript ?? []
     }
 
     private var pendingApproval: ApprovalPrompt? {
-        guard case let .approval(prompt) = coordinator.agentSessions.snapshots[agent.id]?.activePrompt else {
+        guard case let .approval(prompt) = snapshot?.activePrompt else {
             return nil
         }
         return prompt
     }
 
     private var pendingElicitation: UserInputPrompt? {
-        guard case let .userInput(prompt) = coordinator.agentSessions.snapshots[agent.id]?.activePrompt else {
+        guard case let .userInput(prompt) = snapshot?.activePrompt else {
             return nil
         }
         return prompt
     }
 
     private var streaming: String? {
-        coordinator.claudeMonitor.streamingText[agent.id]
+        snapshot?.streamingAssistantText
     }
 
     private var activeTool: String? {
-        coordinator.agentSessions.snapshots[agent.id]?.metadata.activeToolName
+        snapshot?.metadata.activeToolName
     }
 
     private var isThinking: Bool {
@@ -174,12 +178,12 @@ struct ClaudeSessionPanelView: View {
         } trailingControls: {
             HStack(spacing: 6) {
                 ComposerPill(
-                    text: coordinator.agentSessions.snapshots[agent.id]?.metadata.displayModelName ?? "Claude"
+                    text: snapshot?.metadata.displayModelName ?? "Claude"
                 )
                 ComposerModePickerButton(
                     title: "Mode",
                     modes: ClaudeStreamMonitor.permissionModes,
-                    currentMode: coordinator.agentSessions.snapshots[agent.id]?.metadata.permissionMode
+                    currentMode: snapshot?.metadata.permissionMode
                         ?? ClaudeStreamMonitor.defaultPermissionMode,
                     label: { $0 },
                     shortcutKey: "m",

@@ -413,4 +413,40 @@ struct AgentSessionReducerTests {
         #expect(finalSnap.transcript[0].isStreaming == false)
         #expect(finalSnap.metadata.sessionId == "s1")
     }
+
+    // MARK: - Snapshot view helpers
+
+    @Test func streamingAssistantTextReturnsTextOfStreamingItem() {
+        var snap = AgentSessionSnapshot()
+        snap = AgentSessionReducer.reduce(
+            snap,
+            event: .transcriptUpsert(SessionTranscriptItem(id: "u1", kind: .userMessage, text: "hi"))
+        )
+        snap = AgentSessionReducer.reduce(
+            snap,
+            event: .transcriptUpsert(SessionTranscriptItem(
+                id: "a1", kind: .assistantMessage, text: "Hel", isStreaming: true
+            ))
+        )
+        snap = AgentSessionReducer.reduce(snap, event: .transcriptDelta(id: "a1", appendedText: "lo"))
+
+        #expect(snap.streamingAssistantText == "Hello")
+        #expect(snap.finalizedTranscript.count == 1)
+        #expect(snap.finalizedTranscript[0].id == "u1")
+    }
+
+    @Test func streamingAssistantTextIsNilAfterFinish() {
+        var snap = AgentSessionSnapshot()
+        snap = AgentSessionReducer.reduce(
+            snap,
+            event: .transcriptUpsert(SessionTranscriptItem(
+                id: "a1", kind: .assistantMessage, text: "done", isStreaming: true
+            ))
+        )
+        snap = AgentSessionReducer.reduce(snap, event: .transcriptFinished(id: "a1"))
+
+        #expect(snap.streamingAssistantText == nil)
+        #expect(snap.finalizedTranscript.count == 1)
+        #expect(snap.finalizedTranscript[0].id == "a1")
+    }
 }
