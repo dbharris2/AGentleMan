@@ -12,8 +12,8 @@ struct ClaudeSessionPanelView: View {
     @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
-    private var transcript: [CodexTranscriptItem] {
-        coordinator.claudeMonitor.transcriptItems[agent.id] ?? []
+    private var transcript: [SessionTranscriptItem] {
+        coordinator.agentSessions.snapshots[agent.id]?.transcript ?? []
     }
 
     private var pendingApproval: ApprovalPrompt? {

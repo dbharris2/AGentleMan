@@ -33,7 +33,7 @@ extension ClaudeStreamMonitor {
                 text: normalized.text,
                 isStreaming: false,
                 createdAt: normalized.createdAt,
-                imageReferences: normalized.imageReferences,
+                imageData: normalized.imageData,
                 metadata: normalized.metadata
             )
             lastFinalizedStreamId.removeValue(forKey: agentId)
@@ -99,6 +99,7 @@ extension ClaudeStreamMonitor {
             id: item.id,
             kind: kind,
             text: item.displayText,
+            imageData: item.images,
             metadata: metadata
         )
     }

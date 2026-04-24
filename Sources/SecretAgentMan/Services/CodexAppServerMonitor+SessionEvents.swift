@@ -59,6 +59,7 @@ extension CodexAppServerMonitor {
             id: id,
             kind: kind,
             text: item.displayText,
+            imageData: item.images,
             metadata: metadata
         )
     }

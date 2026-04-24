@@ -11,8 +11,8 @@ struct CodexSessionPanelView: View {
     @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
-    private var transcript: [CodexTranscriptItem] {
-        coordinator.codexMonitor.transcriptItems[agent.id] ?? []
+    private var transcript: [SessionTranscriptItem] {
+        coordinator.agentSessions.snapshots[agent.id]?.transcript ?? []
     }
 
     private var pendingInput: UserInputPrompt? {

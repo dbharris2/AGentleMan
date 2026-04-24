@@ -42,7 +42,7 @@ struct SessionTranscriptItem: Identifiable, Equatable {
     let text: String
     let isStreaming: Bool
     let createdAt: Date?
-    let imageReferences: [URL]
+    let imageData: [Data]
     let metadata: TranscriptItemMetadata?
 
     init(
@@ -51,7 +51,7 @@ struct SessionTranscriptItem: Identifiable, Equatable {
         text: String,
         isStreaming: Bool = false,
         createdAt: Date? = nil,
-        imageReferences: [URL] = [],
+        imageData: [Data] = [],
         metadata: TranscriptItemMetadata? = nil
     ) {
         self.id = id
@@ -59,7 +59,7 @@ struct SessionTranscriptItem: Identifiable, Equatable {
         self.text = text
         self.isStreaming = isStreaming
         self.createdAt = createdAt
-        self.imageReferences = imageReferences
+        self.imageData = imageData
         self.metadata = metadata
     }
 }

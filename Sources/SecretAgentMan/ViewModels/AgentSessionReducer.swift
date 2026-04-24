@@ -75,7 +75,7 @@ enum AgentSessionReducer {
                 text: item.text,
                 isStreaming: mergedIsStreaming,
                 createdAt: preservedCreatedAt,
-                imageReferences: item.imageReferences,
+                imageData: item.imageData,
                 metadata: item.metadata
             )
         } else {
@@ -103,7 +103,7 @@ enum AgentSessionReducer {
             text: existing.text + appended,
             isStreaming: true,
             createdAt: existing.createdAt,
-            imageReferences: existing.imageReferences,
+            imageData: existing.imageData,
             metadata: existing.metadata
         )
     }
@@ -121,7 +121,7 @@ enum AgentSessionReducer {
             text: existing.text,
             isStreaming: false,
             createdAt: existing.createdAt,
-            imageReferences: existing.imageReferences,
+            imageData: existing.imageData,
             metadata: existing.metadata
         )
     }
