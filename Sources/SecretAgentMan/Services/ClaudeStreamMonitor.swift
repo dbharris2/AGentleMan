@@ -32,12 +32,13 @@ final class ClaudeStreamMonitor {
     @ObservationIgnored var onSessionConflict: ((UUID) -> Void)?
     @ObservationIgnored var onSessionEvent: ((UUID, SessionEvent) -> Void)?
 
+    // Load-bearing: the monitor needs the original request to resolve
+    // approvals/elicitations via `observers[agentId]?.respondToApproval(...)`
+    // using provider-specific fields like `requestId`.
     private(set) var pendingApprovalRequests: [UUID: ClaudeApprovalRequest] = [:]
     private(set) var pendingElicitations: [UUID: ClaudeElicitationRequest] = [:]
-    private(set) var transcriptItems: [UUID: [CodexTranscriptItem]] = [:]
     private(set) var runtimeStates: [UUID: AgentState] = [:]
-    private(set) var streamingText: [UUID: String] = [:]
-    private(set) var activeToolName: [UUID: String] = [:]
+
     struct SlashCommand {
         let name: String
         let description: String
@@ -45,8 +46,6 @@ final class ClaudeStreamMonitor {
     }
 
     private(set) var slashCommands: [SlashCommand] = []
-    private(set) var modelNames: [UUID: String] = [:]
-    private(set) var contextPercentUsed: [UUID: Double] = [:]
     private(set) var permissionModes: [UUID: String] = [:]
 
     static let permissionModes = ["default", "acceptEdits", "plan", "auto", "bypassPermissions"]
@@ -107,12 +106,6 @@ final class ClaudeStreamMonitor {
                 guard !items.isEmpty else { return }
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    self.transcriptItems[agentId] = items
-                    // Dual-emit: also fold hydrated items into the normalized
-                    // snapshot so the Phase 2 view layer sees them. Without
-                    // this, sessions loaded from disk render an empty
-                    // transcript once the view reads from `snapshots` instead
-                    // of the legacy dict.
                     for item in items {
                         self.emitTranscriptItem(agentId, item: item)
                     }
@@ -142,9 +135,7 @@ final class ClaudeStreamMonitor {
             },
             transcriptItem: { [weak self] id, item in
                 Task { @MainActor in
-                    guard let self else { return }
-                    self.transcriptItems[id, default: []].append(item)
-                    self.emitTranscriptItem(id, item: item)
+                    self?.emitTranscriptItem(id, item: item)
                 }
             },
             approvalRequest: { [weak self] id, request in
@@ -181,16 +172,12 @@ final class ClaudeStreamMonitor {
             },
             streamingText: { [weak self] id, text in
                 Task { @MainActor in
-                    guard let self else { return }
-                    self.streamingText[id] = text
-                    self.emitStreamingText(text, for: id)
+                    self?.emitStreamingText(text, for: id)
                 }
             },
             streamingFinished: { [weak self] id in
                 Task { @MainActor in
-                    guard let self else { return }
-                    self.streamingText.removeValue(forKey: id)
-                    self.emitStreamingFinalize(for: id)
+                    self?.emitStreamingFinalize(for: id)
                 }
             },
             activeToolChanged: { [weak self] id, name in
@@ -213,13 +200,7 @@ final class ClaudeStreamMonitor {
 
     private func applyActiveTool(_ name: String?, for agentId: UUID) {
         var update = SessionMetadataUpdate()
-        if let name {
-            activeToolName[agentId] = name
-            update.activeToolName = .set(name)
-        } else {
-            activeToolName.removeValue(forKey: agentId)
-            update.activeToolName = .clear
-        }
+        update.activeToolName = name.map { .set($0) } ?? .clear
         emit(.metadataUpdated(update), for: agentId)
     }
 
@@ -231,8 +212,6 @@ final class ClaudeStreamMonitor {
     }
 
     private func applyModelInfo(id: UUID, model: String, contextPct: Double) {
-        if !model.isEmpty { modelNames[id] = model }
-        contextPercentUsed[id] = contextPct
         var update = SessionMetadataUpdate()
         if !model.isEmpty { update.displayModelName = .set(model) }
         update.contextPercentUsed = .set(contextPct)
@@ -337,12 +316,7 @@ final class ClaudeStreamMonitor {
         observers.removeValue(forKey: agentId)?.stop()
         pendingApprovalRequests.removeValue(forKey: agentId)
         pendingElicitations.removeValue(forKey: agentId)
-        transcriptItems.removeValue(forKey: agentId)
         runtimeStates.removeValue(forKey: agentId)
-        streamingText.removeValue(forKey: agentId)
-        activeToolName.removeValue(forKey: agentId)
-        modelNames.removeValue(forKey: agentId)
-        contextPercentUsed.removeValue(forKey: agentId)
         permissionModes.removeValue(forKey: agentId)
         activeStreamingId.removeValue(forKey: agentId)
         lastStreamingText.removeValue(forKey: agentId)
@@ -359,9 +333,6 @@ final class ClaudeStreamMonitor {
             role: .system,
             text: text
         )
-        var items = transcriptItems[agentId, default: []]
-        items.append(item)
-        transcriptItems[agentId] = items
         emit(.transcriptUpsert(Self.mapTranscriptItem(item)), for: agentId)
     }
 
@@ -374,7 +345,6 @@ final class ClaudeStreamMonitor {
             text: trimmed,
             images: images.map(\.0)
         )
-        transcriptItems[agentId, default: []].append(userItem)
         emit(.transcriptUpsert(Self.mapTranscriptItem(userItem)), for: agentId)
         // Immediately show "thinking" — don't wait for the first stream event.
         runtimeStates[agentId] = .active
@@ -395,7 +365,6 @@ final class ClaudeStreamMonitor {
     func respondToElicitation(for agentId: UUID, answer: String) {
         guard let request = pendingElicitations[agentId] else { return }
         let userItem = CodexTranscriptItem(id: UUID().uuidString, role: .user, text: answer)
-        transcriptItems[agentId, default: []].append(userItem)
         emit(.transcriptUpsert(Self.mapTranscriptItem(userItem)), for: agentId)
         observers[agentId]?.respondToElicitation(requestId: request.requestId, answer: answer)
         emit(.promptResolved(id: request.requestId), for: agentId)

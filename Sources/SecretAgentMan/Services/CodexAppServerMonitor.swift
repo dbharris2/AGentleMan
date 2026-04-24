@@ -8,24 +8,32 @@ final class CodexAppServerMonitor {
     @ObservationIgnored var onSessionReady: ((UUID, String) -> Void)?
     @ObservationIgnored var onSessionEvent: ((UUID, SessionEvent) -> Void)?
 
+    // Load-bearing: the monitor needs the original request to resolve
+    // prompts via observer callbacks using provider-specific fields
+    // (`itemId`, etc.). `AgentSessionCoordinator.handleAgentStateChange`
+    // also reads these to suppress terminal-state races until the
+    // coordinator migrates to snapshot-driven suppression.
     private(set) var pendingUserInputRequests: [UUID: CodexUserInputRequest] = [:]
     private(set) var pendingApprovalRequests: [UUID: CodexApprovalRequest] = [:]
-    private(set) var transcriptItems: [UUID: [CodexTranscriptItem]] = [:]
-    private(set) var streamingText: [UUID: String] = [:]
     private(set) var runtimeStates: [UUID: AgentState] = [:]
+    /// Debug-only channel retained per plan (provider-specific raw event
+    /// details may exist internally for debugging).
     private(set) var debugMessages: [UUID: String] = [:]
-    private(set) var modelNames: [UUID: String] = [:]
-    private(set) var rawModelNames: [UUID: String] = [:]
-    private(set) var contextPercentUsedByAgent: [UUID: Double] = [:]
-    private(set) var collaborationModes: [UUID: CodexCollaborationMode] = [:]
 
     @ObservationIgnored private var observers: [UUID: Observer] = [:]
 
-    // Normalized event emission state (Phase 1 dual-emit migration).
-    // Visibility relaxed from `private` so the +SessionEvents extension in a
-    // separate file can access them.
+    /// Normalized event emission state (Phase 1 dual-emit migration).
+    /// Visibility relaxed from `private` so the +SessionEvents extension in a
+    /// separate file can access them.
     @ObservationIgnored var streamingItemIds: [UUID: Set<String>] = [:]
-    @ObservationIgnored var pendingLocalUserMessages: [UUID: [(id: String, text: String)]] = [:]
+
+    struct PendingLocalUserMessage {
+        let id: String
+        let text: String
+        let images: [Data]
+    }
+
+    @ObservationIgnored var pendingLocalUserMessages: [UUID: [PendingLocalUserMessage]] = [:]
 
     func syncMonitoredAgents(_ agents: [Agent]) {
         let desired = Dictionary(
@@ -76,14 +84,8 @@ final class CodexAppServerMonitor {
             }
         } onTranscriptItem: { [weak self] id, item in
             Task { @MainActor in self?.handleTranscriptItem(id, item: item) }
-        } onStreamingText: { [weak self] id, text in
-            Task { @MainActor in
-                if text.isEmpty {
-                    self?.streamingText.removeValue(forKey: id)
-                } else {
-                    self?.streamingText[id] = text
-                }
-            }
+        } onStreamingText: { _, _ in
+            // No-op: the normalized path tracks streaming via onStreamDelta.
         } onStreamDelta: { [weak self] id, itemId, delta in
             Task { @MainActor in self?.emitStreamDelta(id: id, itemId: itemId, delta: delta) }
         } onStreamFinalize: { [weak self] id, itemId in
@@ -129,49 +131,30 @@ final class CodexAppServerMonitor {
     }
 
     func handleTranscriptItem(_ agentId: UUID, item: CodexTranscriptItem) {
-        var items = transcriptItems[agentId, default: []]
-        if let idx = items.firstIndex(where: { $0.id == item.id }) {
-            items[idx] = item
-            transcriptItems[agentId] = items
-            emitTranscriptUpsert(agentId, item: item, canonicalId: item.id)
-            return
-        }
+        // Reconcile with an in-flight local user message: the monitor records
+        // user messages under a `local-user-*` id; when the server echoes
+        // the message back, we swap to the server's id but preserve the
+        // client-side image data the server never round-trips.
         if item.role == .user,
-           let localIdx = items.lastIndex(where: {
-               $0.role == .user
-                   && $0.id.hasPrefix("local-user-")
-                   && $0.text == item.text
-           }) {
-            let reconciledLocalId = items[localIdx].id
-            items[localIdx] = CodexTranscriptItem(
+           var pending = pendingLocalUserMessages[agentId],
+           let pendingIdx = pending.lastIndex(where: { $0.text == item.text }) {
+            let local = pending[pendingIdx]
+            pending.remove(at: pendingIdx)
+            pendingLocalUserMessages[agentId] = pending.isEmpty ? nil : pending
+
+            let merged = CodexTranscriptItem(
                 id: item.id,
                 role: item.role,
                 text: item.text,
-                images: items[localIdx].images.isEmpty ? item.images : items[localIdx].images
+                images: item.images.isEmpty ? local.images : item.images
             )
-            transcriptItems[agentId] = items
-            // Normalized path keeps the local id as canonical so the reducer
-            // sees an update, not a duplicate. Drop the matching entry from
-            // the pending-local list so later server echoes don't collide.
-            if var pending = pendingLocalUserMessages[agentId],
-               let pendingIdx = pending.lastIndex(where: { $0.id == reconciledLocalId }) {
-                pending.remove(at: pendingIdx)
-                pendingLocalUserMessages[agentId] = pending.isEmpty ? nil : pending
-            }
-            emitTranscriptUpsert(agentId, item: item, canonicalId: reconciledLocalId)
+            emitTranscriptUpsert(agentId, item: merged, canonicalId: local.id)
             return
         }
-        items.append(item)
-        transcriptItems[agentId] = items
         emitTranscriptUpsert(agentId, item: item, canonicalId: item.id)
     }
 
     private func applyModelInfo(id: UUID, rawModel: String, displayModel: String, mode: CodexCollaborationMode, contextPct: Double) {
-        if !rawModel.isEmpty { rawModelNames[id] = rawModel }
-        if !displayModel.isEmpty { modelNames[id] = displayModel }
-        collaborationModes[id] = mode
-        contextPercentUsedByAgent[id] = contextPct
-
         var update = SessionMetadataUpdate()
         if !rawModel.isEmpty { update.rawModelName = .set(rawModel) }
         if !displayModel.isEmpty { update.displayModelName = .set(displayModel) }
@@ -191,14 +174,8 @@ final class CodexAppServerMonitor {
         observers.removeValue(forKey: agentId)?.stop()
         pendingUserInputRequests.removeValue(forKey: agentId)
         pendingApprovalRequests.removeValue(forKey: agentId)
-        transcriptItems.removeValue(forKey: agentId)
-        streamingText.removeValue(forKey: agentId)
         runtimeStates.removeValue(forKey: agentId)
         debugMessages.removeValue(forKey: agentId)
-        modelNames.removeValue(forKey: agentId)
-        rawModelNames.removeValue(forKey: agentId)
-        contextPercentUsedByAgent.removeValue(forKey: agentId)
-        collaborationModes.removeValue(forKey: agentId)
         streamingItemIds.removeValue(forKey: agentId)
         pendingLocalUserMessages.removeValue(forKey: agentId)
     }
@@ -215,15 +192,13 @@ final class CodexAppServerMonitor {
             text: text,
             images: imageData
         )
-        var items = transcriptItems[agentId, default: []]
-        items.append(item)
-        transcriptItems[agentId] = items
-        pendingLocalUserMessages[agentId, default: []].append((id: item.id, text: text))
+        pendingLocalUserMessages[agentId, default: []].append(
+            PendingLocalUserMessage(id: item.id, text: text, images: imageData)
+        )
         emitTranscriptUpsert(agentId, item: item, canonicalId: item.id)
     }
 
     func setCollaborationMode(for agentId: UUID, mode: CodexCollaborationMode) {
-        collaborationModes[agentId] = mode
         observers[agentId]?.setCollaborationMode(mode)
         var update = SessionMetadataUpdate()
         update.collaborationMode = .set(mode.rawValue)
@@ -253,9 +228,6 @@ final class CodexAppServerMonitor {
             role: .system,
             text: text
         )
-        var items = transcriptItems[agentId, default: []]
-        items.append(item)
-        transcriptItems[agentId] = items
         emitTranscriptUpsert(agentId, item: item, canonicalId: item.id)
     }
 
