@@ -16,12 +16,18 @@ struct ClaudeSessionPanelView: View {
         coordinator.claudeMonitor.transcriptItems[agent.id] ?? []
     }
 
-    private var pendingApproval: ClaudeApprovalRequest? {
-        coordinator.claudeMonitor.pendingApprovalRequests[agent.id]
+    private var pendingApproval: ApprovalPrompt? {
+        guard case let .approval(prompt) = coordinator.agentSessions.snapshots[agent.id]?.activePrompt else {
+            return nil
+        }
+        return prompt
     }
 
-    private var pendingElicitation: ClaudeElicitationRequest? {
-        coordinator.claudeMonitor.pendingElicitations[agent.id]
+    private var pendingElicitation: UserInputPrompt? {
+        guard case let .userInput(prompt) = coordinator.agentSessions.snapshots[agent.id]?.activePrompt else {
+            return nil
+        }
+        return prompt
     }
 
     private var streaming: String? {
@@ -29,7 +35,7 @@ struct ClaudeSessionPanelView: View {
     }
 
     private var activeTool: String? {
-        coordinator.claudeMonitor.activeToolName[agent.id]
+        coordinator.agentSessions.snapshots[agent.id]?.metadata.activeToolName
     }
 
     private var isThinking: Bool {
@@ -61,7 +67,7 @@ struct ClaudeSessionPanelView: View {
                     if let pendingElicitation {
                         SessionElicitationCard(
                             message: pendingElicitation.message,
-                            options: pendingElicitation.options
+                            options: pendingElicitation.questions.first?.options ?? []
                         ) { label in
                             coordinator.answerClaudeElicitation(for: agent.id, answer: label)
                             draft = ""
@@ -231,10 +237,10 @@ struct ClaudeSessionPanelView: View {
         pendingImages.removeAll()
     }
 
-    private func approvalCard(_ request: ClaudeApprovalRequest) -> some View {
+    private func approvalCard(_ prompt: ApprovalPrompt) -> some View {
         SessionApprovalCard(
-            title: "Tool Approval: \(request.displayName)",
-            detail: request.inputDescription,
+            title: "Tool Approval: \(prompt.title)",
+            detail: prompt.message,
             approveTitle: "Allow",
             declineTitle: "Deny",
             supportsDecisions: true,

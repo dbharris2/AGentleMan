@@ -210,7 +210,7 @@ struct SessionLiveToolCard: View {
 
 struct SessionElicitationCard: View {
     let message: String
-    var options: [CodexUserInputOption] = []
+    var options: [PromptOption] = []
     var onSelectOption: ((String) -> Void)?
     @Environment(\.appTheme) private var theme
 
@@ -241,7 +241,7 @@ struct SessionElicitationCard: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
-                        .help(option.description)
+                        .help(option.description ?? "")
                     }
                 }
 
@@ -260,8 +260,8 @@ struct SessionElicitationCard: View {
 struct SessionQuestionCard: View {
     let title: String
     let detail: String
-    let options: [CodexUserInputOption]
-    let onSelect: (CodexUserInputOption) -> Void
+    let options: [PromptOption]
+    let onSelect: (PromptOption) -> Void
     @Environment(\.appTheme) private var theme
 
     var body: some View {
@@ -284,7 +284,7 @@ struct SessionQuestionCard: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .help(option.description)
+                    .help(option.description ?? "")
                 }
             }
         }

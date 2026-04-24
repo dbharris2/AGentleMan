@@ -64,9 +64,13 @@ struct SessionTranscriptItem: Identifiable, Equatable {
     }
 }
 
-struct PromptOption: Equatable {
+struct PromptOption: Equatable, Identifiable {
     let label: String
     let description: String?
+
+    var id: String {
+        label
+    }
 
     init(label: String, description: String? = nil) {
         self.label = label
