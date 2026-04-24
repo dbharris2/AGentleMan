@@ -1,7 +1,8 @@
 import Foundation
+import Observation
 import SwiftUI
 
-@MainActor
+@MainActor @Observable
 final class AgentSessionCoordinator {
     let store: AgentStore
     let terminalManager: TerminalManager
@@ -10,7 +11,13 @@ final class AgentSessionCoordinator {
     let codexMonitor: CodexAppServerMonitor
     let claudeMonitor: ClaudeStreamMonitor
 
-    private var sessionWatcher = FileSystemWatcher()
+    /// Per-agent reduced session snapshots. Populated by the normalized
+    /// `SessionEvent` stream from each provider monitor. Phase 2 of the
+    /// migration is now reading from this in select views; the legacy
+    /// provider-specific dictionaries still back everything else.
+    private(set) var snapshots: [UUID: AgentSessionSnapshot] = [:]
+
+    @ObservationIgnored private var sessionWatcher = FileSystemWatcher()
 
     init(
         store: AgentStore = AgentStore(),
@@ -43,6 +50,10 @@ final class AgentSessionCoordinator {
             handleAgentStateChange(agentId: id, state: state, source: .codex)
         }
 
+        codexMonitor.onSessionEvent = { [self] id, event in
+            reduceSessionEvent(agentId: id, event: event)
+        }
+
         claudeMonitor.onSessionReady = { [self] id, sessionId in
             store.updateSessionId(id: id, sessionId: sessionId)
             store.markLaunched(id: id)
@@ -51,6 +62,10 @@ final class AgentSessionCoordinator {
 
         claudeMonitor.onStateChange = { [self] id, state in
             handleAgentStateChange(agentId: id, state: state, source: .claude)
+        }
+
+        claudeMonitor.onSessionEvent = { [self] id, event in
+            reduceSessionEvent(agentId: id, event: event)
         }
 
         claudeMonitor.onSessionConflict = { [self] id in
@@ -134,6 +149,7 @@ final class AgentSessionCoordinator {
         shellManager.removeTerminal(for: id)
         codexMonitor.removeObserver(for: id)
         claudeMonitor.removeObserver(for: id)
+        snapshots.removeValue(forKey: id)
         store.removeAgent(id: id)
     }
 
@@ -162,6 +178,12 @@ final class AgentSessionCoordinator {
               agent.provider == .claude
         else { return }
         claudeMonitor.ensureSession(for: agent)
+    }
+
+    private func reduceSessionEvent(agentId: UUID, event: SessionEvent) {
+        let previous = snapshots[agentId] ?? AgentSessionSnapshot()
+        let next = AgentSessionReducer.reduce(previous, event: event)
+        snapshots[agentId] = next
     }
 
     private enum StateSource {

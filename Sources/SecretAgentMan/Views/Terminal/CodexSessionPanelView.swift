@@ -11,16 +11,26 @@ struct CodexSessionPanelView: View {
     @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
-    private var transcript: [CodexTranscriptItem] {
-        coordinator.codexMonitor.transcriptItems[agent.id] ?? []
+    private var snapshot: AgentSessionSnapshot? {
+        coordinator.agentSessions.snapshots[agent.id]
     }
 
-    private var pendingInput: CodexUserInputRequest? {
-        coordinator.codexMonitor.pendingUserInputRequests[agent.id]
+    private var transcript: [SessionTranscriptItem] {
+        snapshot?.finalizedTranscript ?? []
     }
 
-    private var pendingApproval: CodexApprovalRequest? {
-        coordinator.codexMonitor.pendingApprovalRequests[agent.id]
+    private var pendingInput: UserInputPrompt? {
+        guard case let .userInput(prompt) = snapshot?.activePrompt else {
+            return nil
+        }
+        return prompt
+    }
+
+    private var pendingApproval: ApprovalPrompt? {
+        guard case let .approval(prompt) = snapshot?.activePrompt else {
+            return nil
+        }
+        return prompt
     }
 
     private var debugMessage: String? {
@@ -28,7 +38,7 @@ struct CodexSessionPanelView: View {
     }
 
     private var streamingText: String? {
-        coordinator.codexMonitor.streamingText[agent.id]
+        snapshot?.streamingAssistantText
     }
 
     private var isThinking: Bool {
@@ -36,12 +46,13 @@ struct CodexSessionPanelView: View {
     }
 
     private var currentModelName: String {
-        let name = coordinator.codexMonitor.modelNames[agent.id]
+        let name = snapshot?.metadata.displayModelName
         return (name?.isEmpty == false ? name : nil) ?? "Codex"
     }
 
     private var currentCollaborationMode: CodexCollaborationMode {
-        coordinator.codexMonitor.collaborationModes[agent.id] ?? .default
+        let raw = snapshot?.metadata.collaborationMode
+        return raw.flatMap(CodexCollaborationMode.init(rawValue:)) ?? .default
     }
 
     @State private var showingUsagePopover = false
@@ -182,13 +193,17 @@ struct CodexSessionPanelView: View {
         pendingImages.removeAll()
     }
 
-    private func approvalCard(_ request: CodexApprovalRequest) -> some View {
-        SessionApprovalCard(
-            title: request.kind.title,
-            detail: request.kind.detail,
+    private func approvalCard(_ prompt: ApprovalPrompt) -> some View {
+        // Codex's approval mapper encodes "supports decisions" in options:
+        // ["allow","deny"] means standard approve/deny; ["dismiss"] means
+        // the request kind (e.g. unsupportedPermissions) can't be answered.
+        let supportsDecisions = prompt.options.contains("allow")
+        return SessionApprovalCard(
+            title: prompt.title,
+            detail: prompt.message,
             approveTitle: "Approve",
             declineTitle: "Decline",
-            supportsDecisions: request.kind.supportsDecisions,
+            supportsDecisions: supportsDecisions,
             unsupportedText: "This permission request is not supported by the current UI yet."
         ) {
             coordinator.answerCodexApproval(for: agent.id, accept: true)
@@ -208,12 +223,12 @@ struct CodexSessionPanelView: View {
         }
     }
 
-    private func inputCard(_ request: CodexUserInputRequest) -> some View {
+    private func inputCard(_ prompt: UserInputPrompt) -> some View {
         VStack(alignment: .leading, spacing: Spacing.xl) {
-            ForEach(request.questions) { question in
+            ForEach(prompt.questions) { question in
                 SessionQuestionCard(
                     title: question.header,
-                    detail: question.prompt,
+                    detail: question.question,
                     options: question.options
                 ) { option in
                     coordinator.answerCodexUserInput(

@@ -22,7 +22,7 @@ struct SessionMarkdownText: View {
 struct SessionTranscriptBubble: View {
     private static let maxBubbleWidth: CGFloat = 720
 
-    let role: CodexTranscriptRole
+    let kind: TranscriptItemKind
     let label: String
     let text: String
     let fontScale: Double
@@ -30,7 +30,7 @@ struct SessionTranscriptBubble: View {
     @Environment(\.appTheme) private var theme
 
     private var isUser: Bool {
-        role == .user
+        kind == .userMessage
     }
 
     private var contentAlignment: HorizontalAlignment {
@@ -65,7 +65,7 @@ struct SessionTranscriptBubble: View {
                     SessionMarkdownText(text: text, fontScale: fontScale)
                 }
                 .padding(Spacing.xxl)
-                .background(SessionPanelTheme.backgroundColor(for: role, in: theme))
+                .background(SessionPanelTheme.backgroundColor(for: kind, in: theme))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         } else {
@@ -210,7 +210,7 @@ struct SessionLiveToolCard: View {
 
 struct SessionElicitationCard: View {
     let message: String
-    var options: [CodexUserInputOption] = []
+    var options: [PromptOption] = []
     var onSelectOption: ((String) -> Void)?
     @Environment(\.appTheme) private var theme
 
@@ -241,7 +241,7 @@ struct SessionElicitationCard: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
-                        .help(option.description)
+                        .help(option.description ?? "")
                     }
                 }
 
@@ -260,8 +260,8 @@ struct SessionElicitationCard: View {
 struct SessionQuestionCard: View {
     let title: String
     let detail: String
-    let options: [CodexUserInputOption]
-    let onSelect: (CodexUserInputOption) -> Void
+    let options: [PromptOption]
+    let onSelect: (PromptOption) -> Void
     @Environment(\.appTheme) private var theme
 
     var body: some View {
@@ -284,7 +284,7 @@ struct SessionQuestionCard: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .help(option.description)
+                    .help(option.description ?? "")
                 }
             }
         }
@@ -428,22 +428,22 @@ struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
 }
 
 enum SessionPanelTheme {
-    static func backgroundColor(for role: CodexTranscriptRole, in theme: AppTheme) -> Color {
-        switch role {
-        case .user:
+    static func backgroundColor(for kind: TranscriptItemKind, in theme: AppTheme) -> Color {
+        switch kind {
+        case .userMessage:
             theme.accent.opacity(0.08)
-        case .assistant:
+        case .assistantMessage:
             theme.foreground.opacity(0.04)
-        case .system:
+        case .systemMessage, .toolActivity, .plan, .diffSummary, .error:
             theme.yellow.opacity(0.08)
         }
     }
 
-    static func label(for role: CodexTranscriptRole, providerName: String) -> String {
-        switch role {
-        case .user: "You"
-        case .assistant: providerName
-        case .system: "System"
+    static func label(for kind: TranscriptItemKind, providerName: String) -> String {
+        switch kind {
+        case .userMessage: "You"
+        case .assistantMessage: providerName
+        case .systemMessage, .toolActivity, .plan, .diffSummary, .error: "System"
         }
     }
 }

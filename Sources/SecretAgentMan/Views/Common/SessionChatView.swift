@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SessionChatView: View {
     let providerName: String
-    let transcript: [CodexTranscriptItem]
+    let transcript: [SessionTranscriptItem]
     let streaming: String?
     let isThinking: Bool
     let activeTool: String?
@@ -65,15 +65,15 @@ struct SessionChatView: View {
                         ForEach(displayedSections) { section in
                             switch section {
                             case let .single(item):
-                                if item.toolName == "TodoWrite" {
-                                    SessionTodoCard(text: item.displayText, fontScale: fontScale)
+                                if item.metadata?.toolName == "TodoWrite" {
+                                    SessionTodoCard(text: item.text, fontScale: fontScale)
                                 } else {
                                     SessionTranscriptBubble(
-                                        role: item.role,
-                                        label: SessionPanelTheme.label(for: item.role, providerName: providerName),
-                                        text: item.displayText,
+                                        kind: item.kind,
+                                        label: SessionPanelTheme.label(for: item.kind, providerName: providerName),
+                                        text: item.text,
                                         fontScale: fontScale,
-                                        images: item.images
+                                        images: item.imageData
                                     )
                                 }
                             case let .systemGroup(items, groupId):
@@ -106,7 +106,7 @@ struct SessionChatView: View {
     }
 
     @ViewBuilder
-    private func systemGroupView(items: [CodexTranscriptItem], groupId: String) -> some View {
+    private func systemGroupView(items: [SessionTranscriptItem], groupId: String) -> some View {
         let isExpanded = expandedGroups.contains(groupId)
 
         VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -146,7 +146,7 @@ struct SessionChatView: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: Spacing.md) {
                     ForEach(mergedExpandedSystemItems(items: items), id: \.id) { item in
-                        SessionMarkdownText(text: item.displayText, fontScale: fontScale)
+                        SessionMarkdownText(text: item.text, fontScale: fontScale)
                             .padding(.leading, 18)
                     }
                 }
@@ -154,8 +154,8 @@ struct SessionChatView: View {
         }
     }
 
-    private func mergedExpandedSystemItems(items: [CodexTranscriptItem]) -> [CodexTranscriptItem] {
-        var merged: [CodexTranscriptItem] = []
+    private func mergedExpandedSystemItems(items: [SessionTranscriptItem]) -> [SessionTranscriptItem] {
+        var merged: [SessionTranscriptItem] = []
 
         for item in items {
             guard let preview = systemPreview(item: item) else {
@@ -163,19 +163,22 @@ struct SessionChatView: View {
                 continue
             }
 
-            let body = systemBody(item.displayText)
+            let body = systemBody(item.text)
             if let last = merged.last,
                let lastPreview = systemPreview(item: last),
                lastPreview.title == preview.title {
-                let mergedBody = [systemBody(last.displayText), body]
+                let mergedBody = [systemBody(last.text), body]
                     .filter { !$0.isEmpty }
                     .joined(separator: "\n\n")
                 let mergedText = mergedBody.isEmpty ? preview.title : "\(preview.title)\n\n\(mergedBody)"
-                merged[merged.count - 1] = CodexTranscriptItem(
+                merged[merged.count - 1] = SessionTranscriptItem(
                     id: last.id,
-                    role: last.role,
+                    kind: last.kind,
                     text: mergedText,
-                    images: last.images
+                    isStreaming: last.isStreaming,
+                    createdAt: last.createdAt,
+                    imageData: last.imageData,
+                    metadata: last.metadata
                 )
             } else {
                 merged.append(item)
@@ -185,7 +188,7 @@ struct SessionChatView: View {
         return merged
     }
 
-    private func collapsedSystemSummary(items: [CodexTranscriptItem]) -> String? {
+    private func collapsedSystemSummary(items: [SessionTranscriptItem]) -> String? {
         let previews = items.compactMap(systemPreview)
         guard !previews.isEmpty else { return nil }
 
@@ -210,8 +213,8 @@ struct SessionChatView: View {
         }
     }
 
-    private func systemPreview(item: CodexTranscriptItem) -> (title: String, details: [String])? {
-        let lines = item.displayText
+    private func systemPreview(item: SessionTranscriptItem) -> (title: String, details: [String])? {
+        let lines = item.text
             .split(separator: "\n")
             .map(String.init)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -232,8 +235,8 @@ struct SessionChatView: View {
 // MARK: - Transcript Grouping
 
 private enum TranscriptSection: Identifiable {
-    case single(CodexTranscriptItem)
-    case systemGroup([CodexTranscriptItem], groupId: String)
+    case single(SessionTranscriptItem)
+    case systemGroup([SessionTranscriptItem], groupId: String)
 
     var id: String {
         switch self {
@@ -242,9 +245,9 @@ private enum TranscriptSection: Identifiable {
         }
     }
 
-    static func group(_ items: [CodexTranscriptItem]) -> [TranscriptSection] {
+    static func group(_ items: [SessionTranscriptItem]) -> [TranscriptSection] {
         var sections: [TranscriptSection] = []
-        var systemRun: [CodexTranscriptItem] = []
+        var systemRun: [SessionTranscriptItem] = []
 
         func flushSystemRun() {
             guard !systemRun.isEmpty else { return }
@@ -258,7 +261,7 @@ private enum TranscriptSection: Identifiable {
         }
 
         for item in items {
-            if item.role == .system {
+            if isGroupableKind(item.kind) {
                 systemRun.append(item)
             } else {
                 flushSystemRun()
@@ -268,6 +271,16 @@ private enum TranscriptSection: Identifiable {
         flushSystemRun()
 
         return sections
+    }
+
+    /// System messages, tool activity, plan, diff summaries, and errors all
+    /// render outside the primary conversation flow; consecutive runs collapse
+    /// into a single expandable "saved tool actions" block.
+    private static func isGroupableKind(_ kind: TranscriptItemKind) -> Bool {
+        switch kind {
+        case .userMessage, .assistantMessage: false
+        case .systemMessage, .toolActivity, .plan, .diffSummary, .error: true
+        }
     }
 }
 

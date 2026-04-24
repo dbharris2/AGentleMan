@@ -6,19 +6,34 @@ import Observation
 final class CodexAppServerMonitor {
     @ObservationIgnored var onStateChange: ((UUID, AgentState) -> Void)?
     @ObservationIgnored var onSessionReady: ((UUID, String) -> Void)?
+    @ObservationIgnored var onSessionEvent: ((UUID, SessionEvent) -> Void)?
 
+    // Load-bearing: the monitor needs the original request to resolve
+    // prompts via observer callbacks using provider-specific fields
+    // (`itemId`, etc.). `AgentSessionCoordinator.handleAgentStateChange`
+    // also reads these to suppress terminal-state races until the
+    // coordinator migrates to snapshot-driven suppression.
     private(set) var pendingUserInputRequests: [UUID: CodexUserInputRequest] = [:]
     private(set) var pendingApprovalRequests: [UUID: CodexApprovalRequest] = [:]
-    private(set) var transcriptItems: [UUID: [CodexTranscriptItem]] = [:]
-    private(set) var streamingText: [UUID: String] = [:]
     private(set) var runtimeStates: [UUID: AgentState] = [:]
+    /// Debug-only channel retained per plan (provider-specific raw event
+    /// details may exist internally for debugging).
     private(set) var debugMessages: [UUID: String] = [:]
-    private(set) var modelNames: [UUID: String] = [:]
-    private(set) var rawModelNames: [UUID: String] = [:]
-    private(set) var contextPercentUsedByAgent: [UUID: Double] = [:]
-    private(set) var collaborationModes: [UUID: CodexCollaborationMode] = [:]
 
     @ObservationIgnored private var observers: [UUID: Observer] = [:]
+
+    /// Normalized event emission state (Phase 1 dual-emit migration).
+    /// Visibility relaxed from `private` so the +SessionEvents extension in a
+    /// separate file can access them.
+    @ObservationIgnored var streamingItemIds: [UUID: Set<String>] = [:]
+
+    struct PendingLocalUserMessage {
+        let id: String
+        let text: String
+        let images: [Data]
+    }
+
+    @ObservationIgnored var pendingLocalUserMessages: [UUID: [PendingLocalUserMessage]] = [:]
 
     func syncMonitoredAgents(_ agents: [Agent]) {
         let desired = Dictionary(
@@ -48,54 +63,45 @@ final class CodexAppServerMonitor {
             return
         }
 
-        let observer = Observer(agent: agent) { [weak self] id, state in
+        let observer = makeObserver(for: agent)
+        observers[agent.id] = observer
+        observer.start()
+    }
+
+    private func makeObserver(for agent: Agent) -> Observer {
+        Observer(agent: agent) { [weak self] id, state in
             Task { @MainActor in
-                self?.runtimeStates[id] = state
-                self?.onStateChange?(id, state)
+                guard let self else { return }
+                self.runtimeStates[id] = state
+                self.onStateChange?(id, state)
+                self.emit(.runStateChanged(Self.mapRunState(state)), for: id)
             }
         } onSessionReady: { [weak self] id, threadId in
             Task { @MainActor in
-                self?.onSessionReady?(id, threadId)
+                guard let self else { return }
+                self.onSessionReady?(id, threadId)
+                self.emit(.sessionReady(sessionId: threadId), for: id)
             }
         } onTranscriptItem: { [weak self] id, item in
-            Task { @MainActor in
-                guard let self else { return }
-                var items = self.transcriptItems[id, default: []]
-                if let idx = items.firstIndex(where: { $0.id == item.id }) {
-                    items[idx] = item
-                } else if item.role == .user,
-                          let localIdx = items.lastIndex(where: {
-                              $0.role == .user
-                                  && $0.id.hasPrefix("local-user-")
-                                  && $0.text == item.text
-                          }) {
-                    items[localIdx] = CodexTranscriptItem(
-                        id: item.id,
-                        role: item.role,
-                        text: item.text,
-                        images: items[localIdx].images.isEmpty ? item.images : items[localIdx].images
-                    )
-                } else {
-                    items.append(item)
-                }
-                self.transcriptItems[id] = items
-            }
-        } onStreamingText: { [weak self] id, text in
-            Task { @MainActor in
-                if text.isEmpty {
-                    self?.streamingText.removeValue(forKey: id)
-                } else {
-                    self?.streamingText[id] = text
-                }
-            }
+            Task { @MainActor in self?.handleTranscriptItem(id, item: item) }
+        } onStreamingText: { _, _ in
+            // No-op: the normalized path tracks streaming via onStreamDelta.
+        } onStreamDelta: { [weak self] id, itemId, delta in
+            Task { @MainActor in self?.emitStreamDelta(id: id, itemId: itemId, delta: delta) }
+        } onStreamFinalize: { [weak self] id, itemId in
+            Task { @MainActor in self?.emitStreamFinalize(id: id, itemId: itemId) }
         } onUserInputRequest: { [weak self] id, request in
             Task { @MainActor in
-                self?.debugMessages.removeValue(forKey: id)
-                self?.pendingUserInputRequests[id] = request
+                guard let self else { return }
+                self.debugMessages.removeValue(forKey: id)
+                self.pendingUserInputRequests[id] = request
+                self.emit(.promptPresented(.userInput(Self.mapUserInputPrompt(request))), for: id)
             }
         } onApprovalRequest: { [weak self] id, request in
             Task { @MainActor in
-                self?.pendingApprovalRequests[id] = request
+                guard let self else { return }
+                self.pendingApprovalRequests[id] = request
+                self.emit(.promptPresented(.approval(Self.mapApprovalPrompt(request))), for: id)
             }
         } onDebugMessage: { [weak self] id, message in
             Task { @MainActor in
@@ -103,27 +109,58 @@ final class CodexAppServerMonitor {
             }
         } onUserInputResolved: { [weak self] id in
             Task { @MainActor in
-                self?.pendingUserInputRequests.removeValue(forKey: id)
+                guard let self else { return }
+                if let pending = self.pendingUserInputRequests[id] {
+                    self.emit(.promptResolved(id: pending.itemId), for: id)
+                }
+                self.pendingUserInputRequests.removeValue(forKey: id)
             }
         } onApprovalResolved: { [weak self] id in
             Task { @MainActor in
-                self?.pendingApprovalRequests.removeValue(forKey: id)
+                guard let self else { return }
+                if let pending = self.pendingApprovalRequests[id] {
+                    self.emit(.promptResolved(id: pending.itemId), for: id)
+                }
+                self.pendingApprovalRequests.removeValue(forKey: id)
             }
         } onModelInfo: { [weak self] id, rawModel, displayModel, mode, contextPct in
             Task { @MainActor in
-                if !rawModel.isEmpty {
-                    self?.rawModelNames[id] = rawModel
-                }
-                if !displayModel.isEmpty {
-                    self?.modelNames[id] = displayModel
-                }
-                self?.collaborationModes[id] = mode
-                self?.contextPercentUsedByAgent[id] = contextPct
+                self?.applyModelInfo(id: id, rawModel: rawModel, displayModel: displayModel, mode: mode, contextPct: contextPct)
             }
         }
+    }
 
-        observers[agent.id] = observer
-        observer.start()
+    func handleTranscriptItem(_ agentId: UUID, item: CodexTranscriptItem) {
+        // Reconcile with an in-flight local user message: the monitor records
+        // user messages under a `local-user-*` id; when the server echoes
+        // the message back, we swap to the server's id but preserve the
+        // client-side image data the server never round-trips.
+        if item.role == .user,
+           var pending = pendingLocalUserMessages[agentId],
+           let pendingIdx = pending.lastIndex(where: { $0.text == item.text }) {
+            let local = pending[pendingIdx]
+            pending.remove(at: pendingIdx)
+            pendingLocalUserMessages[agentId] = pending.isEmpty ? nil : pending
+
+            let merged = CodexTranscriptItem(
+                id: item.id,
+                role: item.role,
+                text: item.text,
+                images: item.images.isEmpty ? local.images : item.images
+            )
+            emitTranscriptUpsert(agentId, item: merged, canonicalId: local.id)
+            return
+        }
+        emitTranscriptUpsert(agentId, item: item, canonicalId: item.id)
+    }
+
+    private func applyModelInfo(id: UUID, rawModel: String, displayModel: String, mode: CodexCollaborationMode, contextPct: Double) {
+        var update = SessionMetadataUpdate()
+        if !rawModel.isEmpty { update.rawModelName = .set(rawModel) }
+        if !displayModel.isEmpty { update.displayModelName = .set(displayModel) }
+        update.collaborationMode = .set(mode.rawValue)
+        update.contextPercentUsed = .set(contextPct)
+        emit(.metadataUpdated(update), for: id)
     }
 
     func stopAll() {
@@ -137,14 +174,10 @@ final class CodexAppServerMonitor {
         observers.removeValue(forKey: agentId)?.stop()
         pendingUserInputRequests.removeValue(forKey: agentId)
         pendingApprovalRequests.removeValue(forKey: agentId)
-        transcriptItems.removeValue(forKey: agentId)
-        streamingText.removeValue(forKey: agentId)
         runtimeStates.removeValue(forKey: agentId)
         debugMessages.removeValue(forKey: agentId)
-        modelNames.removeValue(forKey: agentId)
-        rawModelNames.removeValue(forKey: agentId)
-        contextPercentUsedByAgent.removeValue(forKey: agentId)
-        collaborationModes.removeValue(forKey: agentId)
+        streamingItemIds.removeValue(forKey: agentId)
+        pendingLocalUserMessages.removeValue(forKey: agentId)
     }
 
     func sendMessage(for agentId: UUID, text: String, imagePaths: [String] = []) {
@@ -159,14 +192,17 @@ final class CodexAppServerMonitor {
             text: text,
             images: imageData
         )
-        var items = transcriptItems[agentId, default: []]
-        items.append(item)
-        transcriptItems[agentId] = items
+        pendingLocalUserMessages[agentId, default: []].append(
+            PendingLocalUserMessage(id: item.id, text: text, images: imageData)
+        )
+        emitTranscriptUpsert(agentId, item: item, canonicalId: item.id)
     }
 
     func setCollaborationMode(for agentId: UUID, mode: CodexCollaborationMode) {
-        collaborationModes[agentId] = mode
         observers[agentId]?.setCollaborationMode(mode)
+        var update = SessionMetadataUpdate()
+        update.collaborationMode = .set(mode.rawValue)
+        emit(.metadataUpdated(update), for: agentId)
     }
 
     func setApprovalPolicy(for agentId: UUID, policy: CodexApprovalPolicy) {
@@ -192,14 +228,13 @@ final class CodexAppServerMonitor {
             role: .system,
             text: text
         )
-        var items = transcriptItems[agentId, default: []]
-        items.append(item)
-        transcriptItems[agentId] = items
+        emitTranscriptUpsert(agentId, item: item, canonicalId: item.id)
     }
 
     func respondToUserInput(for agentId: UUID, answers: [String: [String]]) {
-        guard pendingUserInputRequests[agentId] != nil else { return }
+        guard let pending = pendingUserInputRequests[agentId] else { return }
         observers[agentId]?.respondToUserInput(answers: answers)
+        emit(.promptResolved(id: pending.itemId), for: agentId)
         pendingUserInputRequests.removeValue(forKey: agentId)
     }
 
@@ -247,6 +282,8 @@ private final class Observer: @unchecked Sendable {
     private let onSessionReady: (UUID, String) -> Void
     private let onTranscriptItem: (UUID, CodexTranscriptItem) -> Void
     private let onStreamingText: (UUID, String) -> Void
+    private let onStreamDelta: (UUID, String, String) -> Void
+    private let onStreamFinalize: (UUID, String) -> Void
     private let onUserInputRequest: (UUID, CodexUserInputRequest) -> Void
     private let onApprovalRequest: (UUID, CodexApprovalRequest) -> Void
     private let onDebugMessage: (UUID, String) -> Void
@@ -286,6 +323,8 @@ private final class Observer: @unchecked Sendable {
         onSessionReady: @escaping (UUID, String) -> Void,
         onTranscriptItem: @escaping (UUID, CodexTranscriptItem) -> Void,
         onStreamingText: @escaping (UUID, String) -> Void,
+        onStreamDelta: @escaping (UUID, String, String) -> Void,
+        onStreamFinalize: @escaping (UUID, String) -> Void,
         onUserInputRequest: @escaping (UUID, CodexUserInputRequest) -> Void,
         onApprovalRequest: @escaping (UUID, CodexApprovalRequest) -> Void,
         onDebugMessage: @escaping (UUID, String) -> Void,
@@ -298,6 +337,8 @@ private final class Observer: @unchecked Sendable {
         self.onSessionReady = onSessionReady
         self.onTranscriptItem = onTranscriptItem
         self.onStreamingText = onStreamingText
+        self.onStreamDelta = onStreamDelta
+        self.onStreamFinalize = onStreamFinalize
         self.onUserInputRequest = onUserInputRequest
         self.onApprovalRequest = onApprovalRequest
         self.onDebugMessage = onDebugMessage
@@ -848,6 +889,7 @@ private extension Observer {
         streamingAgentMessages[itemId] = updated
         activeStreamingItemId = itemId
         onStreamingText(agent.id, updated)
+        onStreamDelta(agent.id, itemId, delta)
     }
 
     func handleToolOutputDelta(itemId: String, delta: String) {
@@ -887,6 +929,7 @@ private extension Observer {
                 activeStreamingItemId = nil
                 onStreamingText(agent.id, "")
             }
+            onStreamFinalize(agent.id, rawId)
         }
 
         if itemType == "userMessage", !pendingImageTempPaths.isEmpty {

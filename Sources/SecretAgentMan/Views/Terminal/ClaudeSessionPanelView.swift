@@ -12,35 +12,45 @@ struct ClaudeSessionPanelView: View {
     @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
-    private var transcript: [CodexTranscriptItem] {
-        coordinator.claudeMonitor.transcriptItems[agent.id] ?? []
+    private var snapshot: AgentSessionSnapshot? {
+        coordinator.agentSessions.snapshots[agent.id]
     }
 
-    private var pendingApproval: ClaudeApprovalRequest? {
-        coordinator.claudeMonitor.pendingApprovalRequests[agent.id]
+    private var transcript: [SessionTranscriptItem] {
+        snapshot?.finalizedTranscript ?? []
     }
 
-    private var pendingElicitation: ClaudeElicitationRequest? {
-        coordinator.claudeMonitor.pendingElicitations[agent.id]
+    private var pendingApproval: ApprovalPrompt? {
+        guard case let .approval(prompt) = snapshot?.activePrompt else {
+            return nil
+        }
+        return prompt
+    }
+
+    private var pendingElicitation: UserInputPrompt? {
+        guard case let .userInput(prompt) = snapshot?.activePrompt else {
+            return nil
+        }
+        return prompt
     }
 
     private var streaming: String? {
-        coordinator.claudeMonitor.streamingText[agent.id]
+        snapshot?.streamingAssistantText
     }
 
     private var activeTool: String? {
-        coordinator.claudeMonitor.activeToolName[agent.id]
+        snapshot?.metadata.activeToolName
     }
 
     private var isThinking: Bool {
         agent.state == .active && streaming == nil
     }
 
-    private var slashSuggestions: [ClaudeStreamMonitor.SlashCommand] {
+    private var slashSuggestions: [SessionSlashCommand] {
         let stripped = draft.replacingOccurrences(of: "\n", with: "")
         guard stripped.hasPrefix("/"), !stripped.contains(" ") else { return [] }
         let query = String(stripped.dropFirst()).lowercased()
-        let commands = coordinator.claudeMonitor.slashCommands
+        let commands = snapshot?.metadata.slashCommands ?? []
         if query.isEmpty { return commands }
         return commands.filter { $0.name.lowercased().hasPrefix(query) }
     }
@@ -61,7 +71,7 @@ struct ClaudeSessionPanelView: View {
                     if let pendingElicitation {
                         SessionElicitationCard(
                             message: pendingElicitation.message,
-                            options: pendingElicitation.options
+                            options: pendingElicitation.questions.first?.options ?? []
                         ) { label in
                             coordinator.answerClaudeElicitation(for: agent.id, answer: label)
                             draft = ""
@@ -168,12 +178,12 @@ struct ClaudeSessionPanelView: View {
         } trailingControls: {
             HStack(spacing: 6) {
                 ComposerPill(
-                    text: coordinator.claudeMonitor.modelNames[agent.id] ?? "Claude"
+                    text: snapshot?.metadata.displayModelName ?? "Claude"
                 )
                 ComposerModePickerButton(
                     title: "Mode",
                     modes: ClaudeStreamMonitor.permissionModes,
-                    currentMode: coordinator.claudeMonitor.permissionModes[agent.id]
+                    currentMode: snapshot?.metadata.permissionMode
                         ?? ClaudeStreamMonitor.defaultPermissionMode,
                     label: { $0 },
                     shortcutKey: "m",
@@ -231,10 +241,10 @@ struct ClaudeSessionPanelView: View {
         pendingImages.removeAll()
     }
 
-    private func approvalCard(_ request: ClaudeApprovalRequest) -> some View {
+    private func approvalCard(_ prompt: ApprovalPrompt) -> some View {
         SessionApprovalCard(
-            title: "Tool Approval: \(request.displayName)",
-            detail: request.inputDescription,
+            title: "Tool Approval: \(prompt.title)",
+            detail: prompt.message,
             approveTitle: "Allow",
             declineTitle: "Deny",
             supportsDecisions: true,
