@@ -36,7 +36,7 @@ struct CodexSessionPanelView: View {
     }
 
     private var currentModelName: String {
-        let name = coordinator.codexMonitor.modelNames[agent.id]
+        let name = coordinator.agentSessions.snapshots[agent.id]?.metadata.displayModelName
         return (name?.isEmpty == false ? name : nil) ?? "Codex"
     }
 

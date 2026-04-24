@@ -1,7 +1,8 @@
 import Foundation
+import Observation
 import SwiftUI
 
-@MainActor
+@MainActor @Observable
 final class AgentSessionCoordinator {
     let store: AgentStore
     let terminalManager: TerminalManager
@@ -11,12 +12,12 @@ final class AgentSessionCoordinator {
     let claudeMonitor: ClaudeStreamMonitor
 
     /// Per-agent reduced session snapshots. Populated by the normalized
-    /// `SessionEvent` stream from each provider monitor. Phase 1 of the
-    /// migration publishes these in parallel with the existing monitor
-    /// dictionaries and callbacks; no consumer reads from here yet.
+    /// `SessionEvent` stream from each provider monitor. Phase 2 of the
+    /// migration is now reading from this in select views; the legacy
+    /// provider-specific dictionaries still back everything else.
     private(set) var snapshots: [UUID: AgentSessionSnapshot] = [:]
 
-    private var sessionWatcher = FileSystemWatcher()
+    @ObservationIgnored private var sessionWatcher = FileSystemWatcher()
 
     init(
         store: AgentStore = AgentStore(),

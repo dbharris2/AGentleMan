@@ -168,7 +168,7 @@ struct ClaudeSessionPanelView: View {
         } trailingControls: {
             HStack(spacing: 6) {
                 ComposerPill(
-                    text: coordinator.claudeMonitor.modelNames[agent.id] ?? "Claude"
+                    text: coordinator.agentSessions.snapshots[agent.id]?.metadata.displayModelName ?? "Claude"
                 )
                 ComposerModePickerButton(
                     title: "Mode",
