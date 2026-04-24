@@ -6,6 +6,7 @@ final class AppCoordinator {
     let repositoryMonitor: RepositoryMonitor
     let prStore: PRStore
     let issueStore: IssueStore
+    let planStore: PlanStore
     let usageMonitor: UsageMonitor
 
     let store: AgentStore
@@ -42,11 +43,13 @@ final class AppCoordinator {
 
         let usageMonitor = UsageMonitor(store: agentSessions.store)
         let issueStore = IssueStore(store: agentSessions.store)
+        let planStore = PlanStore()
 
         self.agentSessions = agentSessions
         self.repositoryMonitor = repositoryMonitor
         self.prStore = prStore
         self.issueStore = issueStore
+        self.planStore = planStore
         self.usageMonitor = usageMonitor
         self.store = agentSessions.store
         terminalManager = agentSessions.terminalManager
@@ -75,6 +78,7 @@ final class AppCoordinator {
         repositoryMonitor.start()
         prStore.start()
         issueStore.start()
+        planStore.start()
         usageMonitor.start()
     }
 
@@ -83,6 +87,7 @@ final class AppCoordinator {
         agentSessions.stop()
         prStore.stop()
         issueStore.stop()
+        planStore.stop()
         usageMonitor.stop()
     }
 
