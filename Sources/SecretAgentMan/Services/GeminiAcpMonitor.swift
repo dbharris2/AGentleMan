@@ -53,6 +53,13 @@ final class GeminiAcpMonitor {
     /// the cached snapshot before emitting normalized transcript updates.
     @ObservationIgnored private(set) var toolCallSnapshots: [UUID: [String: ToolCallSnapshot]] = [:]
 
+    /// Sidecar tool-call data recovered from `~/.gemini/tmp/<slug>/chats/
+    /// session-*.json` for sessions resumed via `session/load`. Used to
+    /// substitute descriptive titles for tool calls that gemini's
+    /// `streamHistory` replay strips down to bare registry names.
+    /// Workaround — see `GeminiSessionSidecar`.
+    @ObservationIgnored private(set) var sidecarToolInfo: [UUID: [String: GeminiSessionSidecar.ToolCallInfo]] = [:]
+
     @ObservationIgnored private var observers: [UUID: Observer] = [:]
 
     init() {}
@@ -115,6 +122,9 @@ final class GeminiAcpMonitor {
         )
         emit(.promptResolved(id: pending.promptId), for: agentId)
         pendingApprovalRequests.removeValue(forKey: agentId)
+        // Turn is still in flight — bump back to `.active` until the
+        // matching `session/prompt` response (or another approval) arrives.
+        onStateChange?(agentId, .active)
     }
 
     func cancelApproval(for agentId: UUID) {
@@ -125,6 +135,7 @@ final class GeminiAcpMonitor {
         )
         emit(.promptResolved(id: pending.promptId), for: agentId)
         pendingApprovalRequests.removeValue(forKey: agentId)
+        onStateChange?(agentId, .active)
     }
 
     func setMode(for agentId: UUID, modeId: String) {
@@ -240,6 +251,19 @@ final class GeminiAcpMonitor {
         activeAssistantStreamId.removeValue(forKey: agentId)
         activeThoughtStreamId.removeValue(forKey: agentId)
         toolCallSnapshots.removeValue(forKey: agentId)
+        sidecarToolInfo.removeValue(forKey: agentId)
+    }
+
+    /// Stash the sidecar map read from disk after a successful
+    /// `session/load`. Subsequent `tool_call` notifications during the
+    /// `streamHistory` replay can then look up the rich title via
+    /// `sidecarToolDescription(_:for:)`.
+    func setSidecarToolInfo(_ info: [String: GeminiSessionSidecar.ToolCallInfo], for agentId: UUID) {
+        sidecarToolInfo[agentId] = info
+    }
+
+    func sidecarToolDescription(_ toolCallId: String, for agentId: UUID) -> String? {
+        sidecarToolInfo[agentId]?[toolCallId]?.description
     }
 
     // MARK: - Internal accessors used by +SessionEvents extension
@@ -570,9 +594,20 @@ private final class Observer: @unchecked Sendable {
         sessionEstablished = true
         let agentId = agent.id
         let monitor = self.monitor
+        let projectRoot = agent.folder
         let queued = queuedPrompts
         queuedPrompts.removeAll()
+
+        // Read gemini's on-disk session JSON to recover descriptive titles
+        // that the ACP `streamHistory` replay drops. Done before the
+        // applyLoadSessionResponse hop so the sidecar is in place by the
+        // time `tool_call` notifications start arriving.
+        let sidecar = GeminiSessionSidecar.toolCallInfo(
+            forSessionId: sessionId,
+            projectRoot: projectRoot
+        )
         DispatchQueue.main.async {
+            monitor?.setSidecarToolInfo(sidecar, for: agentId)
             monitor?.applyLoadSessionResponse(parsed, sessionId: sessionId, for: agentId)
         }
         for prompt in queued {
@@ -616,15 +651,12 @@ private final class Observer: @unchecked Sendable {
                 if self.inFlightPromptId == promptIdGuess {
                     self.inFlightPromptId = nil
                 }
-                guard let result = response.result,
-                      let parsed = try? result.decode(as: GeminiAcpProtocol.PromptResponse.self)
-                else {
-                    if let err = response.error {
-                        self.surfaceDebug(
-                            prefix: "session/prompt error",
-                            text: "code=\(err.code) message=\(err.message)"
-                        )
-                    }
+
+                if let err = response.error {
+                    self.surfaceDebug(
+                        prefix: "session/prompt error",
+                        text: "code=\(err.code) message=\(err.message)"
+                    )
                     let agentId = self.agent.id
                     let monitor = self.monitor
                     DispatchQueue.main.async {
@@ -632,6 +664,35 @@ private final class Observer: @unchecked Sendable {
                     }
                     return
                 }
+
+                guard let result = response.result else {
+                    self.surfaceDebug(prefix: "session/prompt response missing result", text: "")
+                    let agentId = self.agent.id
+                    let monitor = self.monitor
+                    DispatchQueue.main.async {
+                        monitor?.endTurn(for: agentId)
+                    }
+                    return
+                }
+
+                let parsed: GeminiAcpProtocol.PromptResponse
+                do {
+                    parsed = try result.decode(as: GeminiAcpProtocol.PromptResponse.self)
+                } catch {
+                    let raw = (try? JSONEncoder().encode(result))
+                        .flatMap { String(data: $0, encoding: .utf8) } ?? "<unencodable>"
+                    self.surfaceDebug(
+                        prefix: "session/prompt response decode failed: \(error.localizedDescription)",
+                        text: raw
+                    )
+                    let agentId = self.agent.id
+                    let monitor = self.monitor
+                    DispatchQueue.main.async {
+                        monitor?.endTurn(for: agentId)
+                    }
+                    return
+                }
+
                 let agentId = self.agent.id
                 let monitor = self.monitor
                 DispatchQueue.main.async {

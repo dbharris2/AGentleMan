@@ -178,9 +178,15 @@ extension GeminiAcpMonitor {
         _ call: GeminiAcpProtocol.ToolCall,
         for agentId: UUID
     ) {
+        // Finalize any active assistant/thought stream so the tool call
+        // renders in chronological order. Without this, gemini's multi-step
+        // turns (text → tool → text → tool ...) all delta into one stream
+        // item that stays at its first transcript position; subsequent tool
+        // items appear visually after the (still-streaming) text bubble.
+        finalizeActiveStreams(for: agentId)
         let snapshot = ToolCallSnapshot(
             toolCallId: call.toolCallId,
-            title: call.title,
+            title: titleForToolCall(call.toolCallId, fallback: call.title, for: agentId),
             kind: call.kind,
             status: call.status,
             locations: call.locations ?? [],
@@ -193,23 +199,53 @@ extension GeminiAcpMonitor {
         emit(.metadataUpdated(meta), for: agentId)
     }
 
+    /// Picks the best title for a tool call: prefer the sidecar
+    /// `description` (from gemini's on-disk session JSON) when the ACP
+    /// payload's title is a bare registry name (the `streamHistory` replay
+    /// shape). Falls through to the supplied title otherwise.
+    private func titleForToolCall(_ toolCallId: String, fallback: String, for agentId: UUID) -> String {
+        if let sidecar = sidecarToolDescription(toolCallId, for: agentId), !sidecar.isEmpty {
+            return sidecar
+        }
+        return fallback
+    }
+
+    /// Closes any active assistant or thought stream so the next chunk after
+    /// a non-text event allocates a fresh transcript item. Called before
+    /// emitting tool calls / plans / mode changes that would otherwise be
+    /// rendered out of order relative to the still-streaming text.
+    private func finalizeActiveStreams(for agentId: UUID) {
+        if let assistantId = consumeAssistantStreamId(for: agentId) {
+            emit(.transcriptFinished(id: assistantId), for: agentId)
+        }
+        if let thoughtId = consumeThoughtStreamId(for: agentId) {
+            emit(.transcriptFinished(id: thoughtId), for: agentId)
+        }
+    }
+
     private func handleToolCallUpdate(
         _ update: GeminiAcpProtocol.ToolCallUpdate,
         for agentId: UUID
     ) {
-        // Out-of-order update for a tool call we never saw: synthesize a
-        // minimal snapshot so the user still sees something rather than
-        // silently dropping the event.
+        // Synthesizing a tool item for an out-of-order update means inserting
+        // it into the transcript here. Finalize active streams first so the
+        // chronological position is preserved.
+        let isOrphan = currentToolCall(update.toolCallId, for: agentId) == nil
+        if isOrphan {
+            finalizeActiveStreams(for: agentId)
+        }
         var snapshot = currentToolCall(update.toolCallId, for: agentId) ?? ToolCallSnapshot(
             toolCallId: update.toolCallId,
-            title: update.title ?? "Tool call",
+            title: titleForToolCall(update.toolCallId, fallback: update.title ?? "Tool call", for: agentId),
             kind: update.kind,
             status: update.status,
             locations: update.locations ?? [],
             contentSummary: Self.summarizeToolContent(update.content)
         )
 
-        if let title = update.title, !title.isEmpty { snapshot.title = title }
+        if let title = update.title, !title.isEmpty {
+            snapshot.title = titleForToolCall(update.toolCallId, fallback: title, for: agentId)
+        }
         if let kind = update.kind { snapshot.kind = kind }
         if let status = update.status { snapshot.status = status }
         if let locations = update.locations { snapshot.locations = locations }
@@ -234,6 +270,7 @@ extension GeminiAcpMonitor {
     // MARK: - Plan / commands / mode
 
     private func handlePlan(_ plan: GeminiAcpProtocol.Plan, for agentId: UUID) {
+        finalizeActiveStreams(for: agentId)
         let id = "gemini-plan-\(agentId.uuidString)"
         emit(
             .transcriptUpsert(SessionTranscriptItem(
@@ -318,6 +355,8 @@ extension GeminiAcpMonitor {
             for: agentId
         )
         emit(.promptPresented(.approval(prompt)), for: agentId)
+        // Drives the sidebar's red "needs permission" hand badge.
+        onStateChange?(agentId, .needsPermission)
     }
 
     // MARK: - Static mappers (pure functions)
@@ -417,11 +456,15 @@ extension GeminiAcpMonitor {
         case .failed?: " (failed)"
         case .none: ""
         }
-        let titleLine = snapshot.title + statusSuffix
+        let kindLabel = Self.toolKindLabel(snapshot.kind)
+        let descriptive = Self.descriptiveTitle(from: snapshot)
+        let firstLine = descriptive.isEmpty
+            ? kindLabel + statusSuffix
+            : "\(kindLabel)  \(descriptive)\(statusSuffix)"
         let body = if snapshot.contentSummary.isEmpty {
-            titleLine
+            firstLine
         } else {
-            titleLine + "\n" + snapshot.contentSummary
+            firstLine + "\n" + snapshot.contentSummary
         }
         return SessionTranscriptItem(
             id: "gemini-tool-\(snapshot.toolCallId)",
@@ -434,5 +477,53 @@ extension GeminiAcpMonitor {
                 providerItemType: "gemini.tool_call"
             )
         )
+    }
+
+    /// Decide what (if anything) to render after the kind label.
+    ///
+    /// In `gemini --acp 0.38.2`, `tool_call` notifications take two shapes:
+    ///   - **Live execution** (`acpClient.ts:13554`): `title = displayTitle`,
+    ///     the per-tool descriptive blurb (e.g. `'pattern' within ./`).
+    ///   - **`session/load` replay** (`acpClient.ts:13226`): `title =
+    ///     toolCall.displayName || toolCall.name`, i.e. the registry tool
+    ///     name (`SearchText`, `ReadFile`, `ReadFolder`).
+    ///
+    /// The replay-path title duplicates the kind label (`Search SearchText`
+    /// is noise) so we drop it when it looks like a bare CamelCase
+    /// identifier and fall back to any `locations` array. Live-execution
+    /// titles always contain spaces or punctuation and pass through as-is.
+    static func descriptiveTitle(from snapshot: ToolCallSnapshot) -> String {
+        let trimmed = snapshot.title.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty, !isLikelyToolName(trimmed) {
+            return trimmed
+        }
+        return snapshot.locations.map(\.path).joined(separator: ", ")
+    }
+
+    private static func isLikelyToolName(_ string: String) -> Bool {
+        guard let first = string.first, first.isUppercase, string.count >= 2 else {
+            return false
+        }
+        return string.allSatisfy(\.isLetter)
+    }
+
+    /// Human-readable label for the tool kind, prefixed with an emoji to
+    /// match the visual treatment Claude uses (per-tool-name) in
+    /// `ClaudeStreamMonitor.toolSummary`. Empty string for kinds that don't
+    /// add useful context (e.g. `.other`).
+    static func toolKindLabel(_ kind: GeminiAcpProtocol.ToolKind?) -> String {
+        guard let kind else { return "⚙️" }
+        switch kind {
+        case .read: return "👀 Read"
+        case .edit: return "📝 Edit"
+        case .delete: return "🗑️ Delete"
+        case .move: return "🔀 Move"
+        case .search: return "🔍 Search"
+        case .execute: return "💻 Shell"
+        case .think: return "💭 Think"
+        case .fetch: return "🌐 Fetch"
+        case .switchMode: return "🔄 Mode"
+        case .other: return "⚙️"
+        }
     }
 }
