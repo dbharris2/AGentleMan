@@ -410,6 +410,108 @@ struct ClaudeProtocolTests {
         #expect(type == "future_event")
     }
 
+    // MARK: - Message Content
+
+    @Test
+    func decodeLineParsesAssistantTextAndToolUse() throws {
+        let line = #"""
+        {"type":"assistant","uuid":"a-1","message":{"role":"assistant","content":[{"type":"text","text":"Hi"},{"type":"tool_use","id":"toolu_x","name":"Bash","input":{"command":"ls"}}]}}
+        """#
+        let event = try #require(try ClaudeProtocol.decodeLine(line))
+        guard case let .assistant(message) = event else {
+            Issue.record("expected assistant, got \(event)")
+            return
+        }
+        #expect(message.uuid == "a-1")
+        guard case let .blocks(blocks) = message.message?.content else {
+            Issue.record("expected blocks, got \(String(describing: message.message?.content))")
+            return
+        }
+        #expect(blocks.count == 2)
+        guard case let .text(text) = blocks[0] else {
+            Issue.record("expected text, got \(blocks[0])")
+            return
+        }
+        #expect(text == "Hi")
+        guard case let .toolUse(use) = blocks[1] else {
+            Issue.record("expected toolUse, got \(blocks[1])")
+            return
+        }
+        #expect(use.name == "Bash")
+        #expect(use.input?["command"]?.stringValue == "ls")
+    }
+
+    @Test
+    func userMessageAcceptsStringContent() throws {
+        let line = #"""
+        {"type":"user","uuid":"u-1","userType":"external","message":{"role":"user","content":"hello"}}
+        """#
+        let event = try #require(try ClaudeProtocol.decodeLine(line))
+        guard case let .user(message) = event else {
+            Issue.record("expected user, got \(event)")
+            return
+        }
+        #expect(message.userType == "external")
+        guard case let .text(text) = message.message?.content else {
+            Issue.record("expected .text content")
+            return
+        }
+        #expect(text == "hello")
+    }
+
+    @Test
+    func toolResultAssemblesContentFromArrayOfTextBlocks() throws {
+        // Wire variant: tool_result.content can be `[{type:"text", text:"..."}]`.
+        let line = #"""
+        {"type":"user","uuid":"u-2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":[{"type":"text","text":"line one\n"},{"type":"text","text":"line two"}]}]}}
+        """#
+        let event = try #require(try ClaudeProtocol.decodeLine(line))
+        guard case let .user(message) = event,
+              case let .blocks(blocks) = message.message?.content,
+              case let .toolResult(result) = blocks.first
+        else {
+            Issue.record("expected tool_result, got \(event)")
+            return
+        }
+        #expect(result.isError == true)
+        #expect(result.text == "line one\nline two")
+    }
+
+    @Test
+    func toolResultFallsBackToTextField() throws {
+        // Some wire variants put the failure message in a sibling `text` field
+        // rather than `content`. The typed model should still surface it.
+        let line = #"""
+        {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"text":"boom"}]}}
+        """#
+        let event = try #require(try ClaudeProtocol.decodeLine(line))
+        guard case let .user(message) = event,
+              case let .blocks(blocks) = message.message?.content,
+              case let .toolResult(result) = blocks.first
+        else {
+            Issue.record("expected tool_result, got \(event)")
+            return
+        }
+        #expect(result.text == "boom")
+    }
+
+    @Test
+    func unknownContentBlockTypePreservesRaw() throws {
+        let line = #"""
+        {"type":"assistant","message":{"content":[{"type":"future_block","payload":{"x":1}}]}}
+        """#
+        let event = try #require(try ClaudeProtocol.decodeLine(line))
+        guard case let .assistant(message) = event,
+              case let .blocks(blocks) = message.message?.content,
+              case let .unknown(type, raw) = blocks.first
+        else {
+            Issue.record("expected unknown content block, got \(event)")
+            return
+        }
+        #expect(type == "future_block")
+        #expect(raw["payload"]?["x"]?.intValue == 1)
+    }
+
     // MARK: - Helpers
 
     private func requireJSON(_ value: Encodable) throws -> [String: Any] {

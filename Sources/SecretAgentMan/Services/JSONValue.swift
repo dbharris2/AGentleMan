@@ -71,4 +71,40 @@ enum JSONValue: Codable, Equatable {
         else { return [:] }
         return object
     }
+
+    // MARK: - Convenience accessors
+
+    /// Indexes into an `.object` value. Returns `nil` for non-object cases or
+    /// when the key is absent.
+    subscript(key: String) -> JSONValue? {
+        if case let .object(dict) = self {
+            return dict[key]
+        }
+        return nil
+    }
+
+    var stringValue: String? {
+        if case let .string(value) = self { return value }
+        return nil
+    }
+
+    var intValue: Int? {
+        if case let .int(value) = self { return value }
+        return nil
+    }
+
+    var boolValue: Bool? {
+        if case let .bool(value) = self { return value }
+        return nil
+    }
+
+    var arrayValue: [JSONValue]? {
+        if case let .array(value) = self { return value }
+        return nil
+    }
+
+    var objectValue: [String: JSONValue]? {
+        if case let .object(value) = self { return value }
+        return nil
+    }
 }

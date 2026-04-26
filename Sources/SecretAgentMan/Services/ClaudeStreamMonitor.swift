@@ -250,52 +250,32 @@ final class ClaudeStreamMonitor {
 
         var items: [CodexTranscriptItem] = []
         for line in content.split(separator: "\n") {
-            guard let lineData = line.data(using: .utf8),
-                  let object = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  let type = object["type"] as? String
-            else { continue }
+            guard let event = try? ClaudeProtocol.decodeLine(String(line)) else { continue }
 
-            switch type {
-            case "assistant":
-                items.append(contentsOf: transcriptItems(fromAssistantEvent: object))
-            case "user":
-                // During hydration, check if this is a user-typed message or a tool result.
-                // User-typed messages have "userType" field; tool results don't.
-                if object["userType"] != nil {
+            switch event {
+            case let .assistant(message):
+                items.append(contentsOf: transcriptItems(fromAssistantEvent: message))
+            case let .user(message):
+                // User-typed messages have a `userType`; tool results don't.
+                if message.userType != nil {
                     // Skip CLI-injected meta messages (slash-command skill bodies, image
                     // placeholders). Live streaming never surfaces these; hydration shouldn't either.
-                    if object["isMeta"] as? Bool == true { continue }
-                    if let message = object["message"] as? [String: Any] {
-                        let text: String
-                        if let str = message["content"] as? String {
-                            text = str.trimmingCharacters(in: .whitespacesAndNewlines)
-                        } else if let blocks = message["content"] as? [[String: Any]] {
-                            text = blocks.compactMap { block -> String? in
-                                guard block["type"] as? String == "text" else { return nil }
-                                return block["text"] as? String
-                            }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
-                        } else {
-                            continue
-                        }
-                        guard !text.isEmpty else { continue }
+                    if message.isMeta == true { continue }
+                    let text = userTypedText(from: message)
+                    guard !text.isEmpty else { continue }
+                    items.append(CodexTranscriptItem(
+                        id: message.uuid ?? UUID().uuidString,
+                        role: .user,
+                        text: unwrapSlashCommand(text)
+                    ))
+                } else if case let .blocks(blocks) = message.message?.content {
+                    // Tool result — only surface errors during hydration.
+                    for block in blocks {
+                        guard case let .toolResult(result) = block, result.isError == true else { continue }
+                        guard !result.text.isEmpty else { continue }
                         items.append(CodexTranscriptItem(
-                            id: object["uuid"] as? String ?? UUID().uuidString,
-                            role: .user,
-                            text: unwrapSlashCommand(text)
+                            id: UUID().uuidString, role: .system, text: "Error: \(result.text)"
                         ))
-                    }
-                } else {
-                    // Tool result — only surface errors during hydration
-                    if let message = object["message"] as? [String: Any],
-                       let blocks = message["content"] as? [[String: Any]] {
-                        for block in blocks where block["is_error"] as? Bool == true {
-                            let text = block["content"] as? String ?? ""
-                            if !text.isEmpty {
-                                items.append(CodexTranscriptItem(
-                                    id: UUID().uuidString, role: .system, text: "Error: \(text)"
-                                ))
-                            }
-                        }
                     }
                 }
             default:
@@ -303,6 +283,20 @@ final class ClaudeStreamMonitor {
             }
         }
         return items
+    }
+
+    private nonisolated static func userTypedText(from message: ClaudeProtocol.MessageEvent) -> String {
+        guard let content = message.message?.content else { return "" }
+        switch content {
+        case let .text(str):
+            return str.trimmingCharacters(in: .whitespacesAndNewlines)
+        case let .blocks(blocks):
+            let joined = blocks.compactMap { block -> String? in
+                if case let .text(t) = block { return t }
+                return nil
+            }.joined()
+            return joined.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 
     func stopAll() {
@@ -391,41 +385,33 @@ final class ClaudeStreamMonitor {
     }
 
     nonisolated static func transcriptItems(
-        fromAssistantEvent event: [String: Any]
+        fromAssistantEvent message: ClaudeProtocol.MessageEvent
     ) -> [CodexTranscriptItem] {
-        guard let message = event["message"] as? [String: Any],
-              let content = message["content"] as? [[String: Any]]
-        else { return [] }
-
-        let baseId = event["uuid"] as? String ?? UUID().uuidString
+        guard case let .blocks(blocks) = message.message?.content else { return [] }
+        let baseId = message.uuid ?? UUID().uuidString
         var items: [CodexTranscriptItem] = []
 
-        for (index, block) in content.enumerated() {
-            let blockType = block["type"] as? String ?? ""
-            switch blockType {
-            case "text":
-                if let text = block["text"] as? String,
-                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    items.append(CodexTranscriptItem(
-                        id: "\(baseId)-text-\(index)",
-                        role: .assistant,
-                        text: text
-                    ))
-                }
-            case "tool_use":
-                let name = block["name"] as? String ?? "Tool"
-                let input = block["input"] as? [String: Any]
-                let summary = toolUseSummary(name: name, input: input)
+        for (index, block) in blocks.enumerated() {
+            switch block {
+            case let .text(text):
+                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                items.append(CodexTranscriptItem(
+                    id: "\(baseId)-text-\(index)",
+                    role: .assistant,
+                    text: text
+                ))
+            case let .toolUse(use):
+                let summary = toolUseSummary(use: use)
                 // AskUserQuestion and TodoWrite are Claude communicating with the user —
                 // show as assistant messages so they aren't collapsed into the tool drawer.
-                let role: CodexTranscriptRole = (name == "AskUserQuestion" || name == "TodoWrite") ? .assistant : .system
+                let role: CodexTranscriptRole = (use.name == "AskUserQuestion" || use.name == "TodoWrite") ? .assistant : .system
                 items.append(CodexTranscriptItem(
                     id: "\(baseId)-tool-\(index)",
                     role: role,
                     text: summary,
-                    toolName: name
+                    toolName: use.name
                 ))
-            default:
+            case .toolResult, .unknown:
                 break
             }
         }
@@ -460,76 +446,66 @@ final class ClaudeStreamMonitor {
         return name
     }
 
-    private nonisolated static func toolUseSummary(name: String, input: [String: Any]?) -> String {
-        switch name {
+    private nonisolated static func toolUseSummary(use: ClaudeProtocol.ToolUse) -> String {
+        let input = use.input
+        switch use.name {
         case "Bash":
-            let cmd = input?["command"] as? String ?? ""
+            let cmd = input?["command"]?.stringValue ?? ""
             let truncated = cmd.count > 200 ? String(cmd.prefix(200)) + "…" : cmd
             return "💻 **Bash**: `\(truncated)`"
         case "Read":
-            let path = input?["file_path"] as? String ?? ""
-            return "👀 **Read**: \(path)"
+            return "👀 **Read**: \(input?["file_path"]?.stringValue ?? "")"
         case "Write":
-            let path = input?["file_path"] as? String ?? ""
-            return "✏️ **Write**: \(path)"
+            return "✏️ **Write**: \(input?["file_path"]?.stringValue ?? "")"
         case "Edit":
-            let path = input?["file_path"] as? String ?? ""
-            return "📝 **Edit**: \(path)"
+            return "📝 **Edit**: \(input?["file_path"]?.stringValue ?? "")"
         case "Grep":
-            let pattern = input?["pattern"] as? String ?? ""
-            return "🔍 **Grep**: `\(pattern)`"
+            return "🔍 **Grep**: `\(input?["pattern"]?.stringValue ?? "")`"
         case "Glob":
-            let pattern = input?["pattern"] as? String ?? ""
-            return "🗂️ **Glob**: `\(pattern)`"
+            return "🗂️ **Glob**: `\(input?["pattern"]?.stringValue ?? "")`"
         case "AskUserQuestion":
-            if let questions = input?["questions"] as? [[String: Any]],
-               let first = questions.first,
-               let question = first["question"] as? String {
+            if let question = input?["questions"]?.arrayValue?.first?["question"]?.stringValue {
                 return "❓ **Question**: \(question)"
             }
             return "❓ **Question**"
         case "TodoWrite":
             return todoWriteSummary(input: input)
         case "ToolSearch":
-            let query = input?["query"] as? String ?? ""
-            return "🧰 **ToolSearch**: `\(query)`"
+            return "🧰 **ToolSearch**: `\(input?["query"]?.stringValue ?? "")`"
         case "Agent":
-            let desc = input?["description"] as? String ?? ""
-            return "🤖 **Agent**: \(desc)"
+            return "🤖 **Agent**: \(input?["description"]?.stringValue ?? "")"
         case "WebFetch":
-            let url = input?["url"] as? String ?? ""
-            return "🌐 **WebFetch**: \(url)"
+            return "🌐 **WebFetch**: \(input?["url"]?.stringValue ?? "")"
         case "WebSearch":
-            let query = input?["query"] as? String ?? ""
-            return "🔎 **WebSearch**: `\(query)`"
+            return "🔎 **WebSearch**: `\(input?["query"]?.stringValue ?? "")`"
         case "TaskCreate", "TaskUpdate":
-            let subject = input?["subject"] as? String ?? input?["taskId"] as? String ?? ""
-            return "✨ **\(name)**: \(subject)"
+            let subject = input?["subject"]?.stringValue ?? input?["taskId"]?.stringValue ?? ""
+            return "✨ **\(use.name)**: \(subject)"
         default:
-            if let input, !input.isEmpty {
-                let summary = input.prefix(3).map { "\($0.key): \($0.value)" }.joined(separator: ", ")
+            if let dict = input?.objectValue, !dict.isEmpty {
+                let summary = dict.prefix(3).map { "\($0.key): \($0.value)" }.joined(separator: ", ")
                 let truncated = summary.count > 100 ? String(summary.prefix(100)) + "…" : summary
-                return "⚙️ **\(name)**: \(truncated)"
+                return "⚙️ **\(use.name)**: \(truncated)"
             }
-            return "⚙️ **\(name)**"
+            return "⚙️ **\(use.name)**"
         }
     }
 
-    private nonisolated static func todoWriteSummary(input: [String: Any]?) -> String {
-        guard let todos = input?["todos"] as? [[String: Any]], !todos.isEmpty else {
+    private nonisolated static func todoWriteSummary(input: JSONValue?) -> String {
+        guard let todos = input?["todos"]?.arrayValue, !todos.isEmpty else {
             return "**TODO list**"
         }
-        let completed = todos.count(where: { ($0["status"] as? String) == "completed" })
-        let inProgress = todos.count(where: { ($0["status"] as? String) == "in_progress" })
+        let completed = todos.count(where: { $0["status"]?.stringValue == "completed" })
+        let inProgress = todos.count(where: { $0["status"]?.stringValue == "in_progress" })
         var segments: [String] = []
         if inProgress > 0 { segments.append("\(inProgress) in progress") }
         segments.append("\(completed)/\(todos.count) complete")
         let header = "**TODO list** (\(segments.joined(separator: ", ")))"
 
         let rows = todos.map { todo -> String in
-            let status = todo["status"] as? String ?? "pending"
-            let content = todo["content"] as? String ?? ""
-            let activeForm = todo["activeForm"] as? String ?? content
+            let status = todo["status"]?.stringValue ?? "pending"
+            let content = todo["content"]?.stringValue ?? ""
+            let activeForm = todo["activeForm"]?.stringValue ?? content
             switch status {
             case "completed": return "- ✅ \(content)"
             case "in_progress": return "- 🔄 **\(activeForm)**"
@@ -893,10 +869,10 @@ private final class Observer: @unchecked Sendable {
         switch event {
         case let .system(raw):
             handleSystemEvent(raw.legacyDictionary())
-        case let .assistant(raw):
-            handleAssistantEvent(raw.legacyDictionary())
-        case let .user(raw):
-            handleUserEvent(raw.legacyDictionary())
+        case let .assistant(message):
+            handleAssistantEvent(message)
+        case let .user(message):
+            handleUserEvent(message)
         case let .streamEvent(stream):
             handleStreamEvent(stream)
         case let .controlRequest(controlEvent):
@@ -928,31 +904,29 @@ private final class Observer: @unchecked Sendable {
         // spuriously show the "thinking" indicator on permission mode changes.
     }
 
-    private func handleAssistantEvent(_ event: [String: Any]) {
+    private func handleAssistantEvent(_ message: ClaudeProtocol.MessageEvent) {
         finalizeStreaming()
 
-        for item in ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: event) {
+        for item in ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: message) {
             delegate.transcriptItem(agent.id, item)
         }
         publishIfChanged(.active)
     }
 
-    private func handleUserEvent(_ event: [String: Any]) {
+    private func handleUserEvent(_ message: ClaudeProtocol.MessageEvent) {
         // Only surface error tool results — successful results are noise.
         // The "thinking" bubble covers the gap while tools execute.
-        guard let message = event["message"] as? [String: Any],
-              let content = message["content"] as? [[String: Any]]
-        else { return }
+        guard case let .blocks(blocks) = message.message?.content else { return }
 
-        for block in content {
-            let isError = block["is_error"] as? Bool ?? false
-            guard isError else { continue }
-            let text = block["content"] as? String ?? block["text"] as? String ?? ""
-            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+        for block in blocks {
+            guard case let .toolResult(result) = block, result.isError == true else { continue }
+            let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let truncated = trimmed.count > 500 ? String(trimmed.prefix(500)) + "…" : trimmed
             let item = CodexTranscriptItem(
                 id: UUID().uuidString,
                 role: .system,
-                text: "Error: \(text.count > 500 ? String(text.prefix(500)) + "…" : text)"
+                text: "Error: \(truncated)"
             )
             delegate.transcriptItem(agent.id, item)
         }

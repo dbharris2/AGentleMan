@@ -49,7 +49,7 @@ struct ClaudeStreamMonitorTests {
 
     @Test
     func parsesTextFromAssistantEvent() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "type": "assistant",
             "uuid": "evt-001",
             "message": [
@@ -57,7 +57,7 @@ struct ClaudeStreamMonitorTests {
                     ["type": "text", "text": "Hello from Claude"],
                 ],
             ],
-        ])
+        ]))
 
         #expect(items.count == 1)
         #expect(items.first?.role == .assistant)
@@ -66,7 +66,7 @@ struct ClaudeStreamMonitorTests {
 
     @Test
     func parsesTextAndToolUseFromAssistantEvent() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "type": "assistant",
             "uuid": "evt-002",
             "message": [
@@ -76,7 +76,7 @@ struct ClaudeStreamMonitorTests {
                     ["type": "text", "text": "Done."],
                 ],
             ],
-        ])
+        ]))
 
         #expect(items.count == 3)
         #expect(items[0].role == .assistant)
@@ -90,7 +90,7 @@ struct ClaudeStreamMonitorTests {
 
     @Test
     func parsesToolUseOnlyAssistantEvent() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "type": "assistant",
             "uuid": "evt-003",
             "message": [
@@ -98,7 +98,7 @@ struct ClaudeStreamMonitorTests {
                     ["type": "tool_use", "name": "Write", "input": ["file_path": "/tmp/x"]],
                 ],
             ],
-        ])
+        ]))
 
         #expect(items.count == 1)
         #expect(items.first?.role == .system)
@@ -107,21 +107,21 @@ struct ClaudeStreamMonitorTests {
 
     @Test
     func returnsEmptyForAssistantEventWithNoContent() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "type": "assistant",
             "uuid": "evt-empty",
             "message": [
                 "content": [] as [[String: Any]],
             ],
-        ])
+        ]))
         #expect(items.isEmpty)
     }
 
     @Test
     func returnsEmptyForMalformedAssistantEvent() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "type": "assistant",
-        ])
+        ]))
         #expect(items.isEmpty)
     }
 
@@ -129,33 +129,33 @@ struct ClaudeStreamMonitorTests {
 
     @Test
     func toolUseSummaryForBash() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "uuid": "evt-bash",
             "message": [
                 "content": [
                     ["type": "tool_use", "name": "Bash", "input": ["command": "ls -la"]],
                 ],
             ],
-        ])
+        ]))
         #expect(items.first?.text == "💻 **Bash**: `ls -la`")
     }
 
     @Test
     func toolUseSummaryForRead() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "uuid": "evt-read",
             "message": [
                 "content": [
                     ["type": "tool_use", "name": "Read", "input": ["file_path": "/tmp/foo.swift"]],
                 ],
             ],
-        ])
+        ]))
         #expect(items.first?.text == "👀 **Read**: /tmp/foo.swift")
     }
 
     @Test
     func toolUseSummaryForAskUserQuestion() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "uuid": "evt-ask",
             "message": [
                 "content": [
@@ -170,33 +170,33 @@ struct ClaudeStreamMonitorTests {
                     ],
                 ],
             ],
-        ])
+        ]))
         #expect(items.first?.text == "❓ **Question**: What color?")
     }
 
     @Test
     func toolUseSummaryForToolSearch() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "uuid": "evt-ts",
             "message": [
                 "content": [
                     ["type": "tool_use", "name": "ToolSearch", "input": ["query": "select:AskUserQuestion"]],
                 ],
             ],
-        ])
+        ]))
         #expect(items.first?.text == "🧰 **ToolSearch**: `select:AskUserQuestion`")
     }
 
     @Test
     func toolUseSummaryForUnknownToolShowsInput() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "uuid": "evt-unknown",
             "message": [
                 "content": [
                     ["type": "tool_use", "name": "CustomTool", "input": ["foo": "bar"]],
                 ],
             ],
-        ])
+        ]))
         #expect(items.first?.text.contains("CustomTool") == true)
         #expect(items.first?.text.contains("foo") == true)
     }
@@ -219,9 +219,9 @@ struct ClaudeStreamMonitorTests {
             // Assistant message
             #"{"type":"assistant","uuid":"a1","message":{"content":[{"type":"text","text":"Hi there!"}]}}"#,
             // Successful tool result (should be suppressed)
-            #"{"type":"user","uuid":"u2","message":{"role":"user","content":[{"content":"file written","is_error":false,"tool_use_id":"t1"}]}}"#,
+            #"{"type":"user","uuid":"u2","message":{"role":"user","content":[{"type":"tool_result","content":"file written","is_error":false,"tool_use_id":"t1"}]}}"#,
             // Error tool result (should be shown)
-            #"{"type":"user","uuid":"u4","message":{"role":"user","content":[{"content":"Permission denied","is_error":true,"tool_use_id":"t2"}]}}"#,
+            #"{"type":"user","uuid":"u4","message":{"role":"user","content":[{"type":"tool_result","content":"Permission denied","is_error":true,"tool_use_id":"t2"}]}}"#,
             // Another user message
             #"{"type":"user","uuid":"u3","userType":"external","message":{"role":"user","content":"thanks"}}"#,
         ]
@@ -324,7 +324,7 @@ struct ClaudeStreamMonitorTests {
 
     @Test
     func toolUseSummaryForAskUserQuestionWithNestedQuestions() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "uuid": "evt-nested",
             "message": [
                 "content": [
@@ -346,13 +346,13 @@ struct ClaudeStreamMonitorTests {
                     ],
                 ],
             ],
-        ])
+        ]))
         #expect(items.first?.text == "❓ **Question**: What framework?")
     }
 
     @Test
     func toolUseSummaryForAskUserQuestionWithEmptyQuestions() {
-        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: [
+        let items = ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: assistantMessage([
             "uuid": "evt-empty-q",
             "message": [
                 "content": [
@@ -365,7 +365,19 @@ struct ClaudeStreamMonitorTests {
                     ],
                 ],
             ],
-        ])
+        ]))
         #expect(items.first?.text == "❓ **Question**")
+    }
+
+    // MARK: - Helpers
+
+    /// Builds a `MessageEvent` from the same `[String: Any]` shape the legacy
+    /// dict-based tests used. JSONSerialization → JSONDecoder so the test
+    /// dispatch matches what production sees off the wire.
+    private func assistantMessage(_ json: [String: Any]) -> ClaudeProtocol.MessageEvent {
+        // swiftlint:disable:next force_try
+        let data = try! JSONSerialization.data(withJSONObject: json)
+        // swiftlint:disable:next force_try
+        return try! JSONDecoder().decode(ClaudeProtocol.MessageEvent.self, from: data)
     }
 }

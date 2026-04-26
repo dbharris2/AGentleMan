@@ -151,8 +151,8 @@ enum ClaudeProtocol {
     /// with.
     enum Event: Decodable, Equatable {
         case system(JSONValue)
-        case assistant(JSONValue)
-        case user(JSONValue)
+        case assistant(MessageEvent)
+        case user(MessageEvent)
         case streamEvent(StreamEvent)
         case controlRequest(ControlRequestEvent)
         case controlResponse(JSONValue)
@@ -174,8 +174,8 @@ enum ClaudeProtocol {
             let single = try decoder.singleValueContainer()
             switch type {
             case "system": self = try .system(single.decode(JSONValue.self))
-            case "assistant": self = try .assistant(single.decode(JSONValue.self))
-            case "user": self = try .user(single.decode(JSONValue.self))
+            case "assistant": self = try .assistant(single.decode(MessageEvent.self))
+            case "user": self = try .user(single.decode(MessageEvent.self))
             case "stream_event": self = try .streamEvent(single.decode(StreamEventEnvelope.self).event)
             case "control_request": self = try .controlRequest(single.decode(ControlRequestEvent.self))
             case "control_response": self = try .controlResponse(single.decode(JSONValue.self))
@@ -401,6 +401,121 @@ enum ClaudeProtocol {
                 let raw = try decoder.singleValueContainer().decode(JSONValue.self)
                 self = .unknown(type: type, raw: raw)
             }
+        }
+    }
+
+    // MARK: - Message Content (typed)
+
+    /// Top-level shape for `assistant` and `user` events. Both share the
+    /// envelope `{type, uuid?, userType?, isMeta?, message: {role?, content}}`;
+    /// the discriminator is the outer `type`, so `MessageEvent` itself is
+    /// type-agnostic.
+    struct MessageEvent: Decodable, Equatable {
+        let uuid: String?
+        let userType: String?
+        let isMeta: Bool?
+        let message: MessageBody?
+
+        private enum CodingKeys: String, CodingKey {
+            case uuid, userType, isMeta, message
+        }
+    }
+
+    struct MessageBody: Decodable, Equatable {
+        let role: String?
+        let content: MessageContent
+    }
+
+    /// `message.content` is either a plain string (user-typed messages) or an
+    /// array of structured content blocks (assistant messages, tool results).
+    enum MessageContent: Decodable, Equatable {
+        case text(String)
+        case blocks([ContentBlock])
+
+        init(from decoder: Decoder) throws {
+            let single = try decoder.singleValueContainer()
+            if let str = try? single.decode(String.self) {
+                self = .text(str)
+            } else {
+                self = try .blocks(single.decode([ContentBlock].self))
+            }
+        }
+    }
+
+    /// One block inside `message.content[]`. V1 surfaces text, tool_use, and
+    /// tool_result; anything else preserves its raw payload.
+    enum ContentBlock: Decodable, Equatable {
+        case text(String)
+        case toolUse(ToolUse)
+        case toolResult(ToolResult)
+        case unknown(type: String, raw: JSONValue)
+
+        private enum CodingKeys: String, CodingKey {
+            case type
+        }
+
+        init(from decoder: Decoder) throws {
+            let keyed = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try keyed.decode(String.self, forKey: .type)
+            let single = try decoder.singleValueContainer()
+            switch type {
+            case "text":
+                struct TextBlock: Decodable {
+                    let text: String?
+                }
+                let block = try single.decode(TextBlock.self)
+                self = .text(block.text ?? "")
+            case "tool_use":
+                self = try .toolUse(single.decode(ToolUse.self))
+            case "tool_result":
+                self = try .toolResult(single.decode(ToolResult.self))
+            default:
+                self = try .unknown(type: type, raw: single.decode(JSONValue.self))
+            }
+        }
+    }
+
+    /// `tool_use` block: an assistant invocation of a named tool with
+    /// open-ended input. Input stays as raw `JSONValue`; per-tool
+    /// projections live alongside (e.g. `AskUserQuestionInput`).
+    struct ToolUse: Decodable, Equatable {
+        let id: String?
+        let name: String
+        let input: JSONValue?
+    }
+
+    /// `tool_result` block: a user-side block reporting a tool's outcome.
+    /// V1 only surfaces these on errors, so we eagerly assemble a display
+    /// string from whichever shape the wire used.
+    struct ToolResult: Decodable, Equatable {
+        let toolUseId: String?
+        let isError: Bool?
+        /// Display text assembled from `content` (string or `[{text}]`) with
+        /// a fallback to a sibling `text` field. Empty when nothing matched.
+        let text: String
+
+        private enum CodingKeys: String, CodingKey {
+            case toolUseId = "tool_use_id"
+            case isError = "is_error"
+            case content, text
+        }
+
+        init(from decoder: Decoder) throws {
+            let keyed = try decoder.container(keyedBy: CodingKeys.self)
+            toolUseId = try keyed.decodeIfPresent(String.self, forKey: .toolUseId)
+            isError = try keyed.decodeIfPresent(Bool.self, forKey: .isError)
+
+            var assembled = ""
+            if let str = try? keyed.decodeIfPresent(String.self, forKey: .content) {
+                assembled = str
+            } else if let blocks = try? keyed.decodeIfPresent([JSONValue].self, forKey: .content) {
+                assembled = blocks.compactMap { $0["text"]?.stringValue }.joined()
+            }
+            if assembled.isEmpty,
+               let fallback = try? keyed.decodeIfPresent(String.self, forKey: .text) {
+                assembled = fallback
+            }
+            text = assembled
         }
     }
 
