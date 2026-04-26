@@ -14,7 +14,7 @@ extension GeminiAcpProtocol {
         case resource(EmbeddedResource)
         /// Forward-compat: agent sent a `type` value V1 doesn't recognize.
         /// Monitor logs and surfaces the raw value but does not crash.
-        case unknown(type: String, raw: GeminiAcpJsonValue)
+        case unknown(type: String, raw: JSONValue)
 
         private enum CodingKeys: String, CodingKey {
             case type
@@ -36,7 +36,7 @@ extension GeminiAcpProtocol {
             case "resource":
                 self = try .resource(single.decode(EmbeddedResource.self))
             default:
-                let raw = try single.decode(GeminiAcpJsonValue.self)
+                let raw = try single.decode(JSONValue.self)
                 self = .unknown(type: type, raw: raw)
             }
         }
@@ -101,7 +101,7 @@ extension GeminiAcpProtocol {
     }
 
     struct EmbeddedResource: Codable, Equatable {
-        let resource: GeminiAcpJsonValue
+        let resource: JSONValue
     }
 
     // MARK: - Plan
@@ -151,7 +151,7 @@ extension GeminiAcpProtocol {
         case content(GeminiAcpProtocol.ContentBlock)
         case diff(Diff)
         case terminal(Terminal)
-        case unknown(type: String, raw: GeminiAcpJsonValue)
+        case unknown(type: String, raw: JSONValue)
 
         private enum CodingKeys: String, CodingKey {
             case type, content
@@ -170,7 +170,7 @@ extension GeminiAcpProtocol {
             case "terminal":
                 self = try .terminal(single.decode(Terminal.self))
             default:
-                let raw = try single.decode(GeminiAcpJsonValue.self)
+                let raw = try single.decode(JSONValue.self)
                 self = .unknown(type: type, raw: raw)
             }
         }
@@ -221,8 +221,8 @@ extension GeminiAcpProtocol {
         let status: ToolCallStatus?
         let content: [ToolCallContent]?
         let locations: [ToolCallLocation]?
-        let rawInput: GeminiAcpJsonValue?
-        let rawOutput: GeminiAcpJsonValue?
+        let rawInput: JSONValue?
+        let rawOutput: JSONValue?
     }
 
     /// Update form has all fields except `toolCallId` optional. The agent
@@ -235,8 +235,8 @@ extension GeminiAcpProtocol {
         let status: ToolCallStatus?
         let content: [ToolCallContent]?
         let locations: [ToolCallLocation]?
-        let rawInput: GeminiAcpJsonValue?
-        let rawOutput: GeminiAcpJsonValue?
+        let rawInput: JSONValue?
+        let rawOutput: JSONValue?
     }
 
     // MARK: - Available commands (slash command metadata)
@@ -269,7 +269,7 @@ extension GeminiAcpProtocol {
     struct UsageUpdate: Codable, Equatable {
         let used: Double
         let size: Double
-        let cost: GeminiAcpJsonValue?
+        let cost: JSONValue?
     }
 
     // MARK: - Content chunks (for user/agent/thought messages)
@@ -299,7 +299,7 @@ extension GeminiAcpProtocol {
         case currentModeUpdate(CurrentModeUpdate)
         case sessionInfoUpdate(SessionInfoUpdate)
         case usageUpdate(UsageUpdate)
-        case unknown(kind: String, raw: GeminiAcpJsonValue)
+        case unknown(kind: String, raw: JSONValue)
 
         private enum CodingKeys: String, CodingKey {
             case sessionUpdate
@@ -331,7 +331,7 @@ extension GeminiAcpProtocol {
             case "usage_update":
                 self = try .usageUpdate(single.decode(UsageUpdate.self))
             default:
-                let raw = try single.decode(GeminiAcpJsonValue.self)
+                let raw = try single.decode(JSONValue.self)
                 self = .unknown(kind: kind, raw: raw)
             }
         }

@@ -1,7 +1,10 @@
 import Foundation
 
 /// Typed wire-format messages for the Claude Code stream-json protocol.
-/// Replaces hand-built [String: Any] dictionaries with Encodable structs.
+///
+/// Outgoing messages and JSON encode/decode entry points live here.
+/// Inbound event models split into `ClaudeProtocol+Inbound.swift` and
+/// per-tool input projections live in `ClaudeProtocol+ToolInputs.swift`.
 enum ClaudeProtocol {
     // MARK: - Outgoing Messages (Encodable)
 
@@ -101,7 +104,7 @@ enum ClaudeProtocol {
         }
 
         enum Decision: Encodable {
-            case allow(updatedInput: [String: Any])
+            case allow(updatedInput: JSONValue)
             case deny(message: String)
 
             func encode(to encoder: Encoder) throws {
@@ -109,10 +112,7 @@ enum ClaudeProtocol {
                 switch self {
                 case let .allow(updatedInput):
                     try container.encode("allow", forKey: .behavior)
-                    // updatedInput contains arbitrary tool input, encode via JSONSerialization
-                    let data = try JSONSerialization.data(withJSONObject: updatedInput)
-                    let raw = try JSONDecoder().decode(AnyCodable.self, from: data)
-                    try container.encode(raw, forKey: .updatedInput)
+                    try container.encode(updatedInput, forKey: .updatedInput)
                 case let .deny(message):
                     try container.encode("deny", forKey: .behavior)
                     try container.encode(message, forKey: .message)
@@ -124,7 +124,7 @@ enum ClaudeProtocol {
             }
         }
 
-        static func allow(requestId: String, updatedInput: [String: Any]) -> PermissionResponse {
+        static func allow(requestId: String, updatedInput: JSONValue) -> PermissionResponse {
             PermissionResponse(
                 response: ResponseBody(
                     request_id: requestId,
@@ -143,68 +143,6 @@ enum ClaudeProtocol {
         }
     }
 
-    // MARK: - Incoming Events (parsed from [String: Any])
-
-    enum Event {
-        case system(sessionId: String?, model: String?, permissionMode: String?)
-        case assistant(uuid: String, contentBlocks: [[String: Any]])
-        case user(uuid: String, contentBlocks: [[String: Any]])
-        case streamEvent(innerType: String, delta: [String: Any]?)
-        case controlRequest(requestId: String, request: [String: Any])
-        case controlResponse(response: [String: Any])
-        case result(isError: Bool, modelUsage: [String: Any]?, sessionId: String?)
-        case rateLimitEvent(utilization: Double, resetsAt: TimeInterval?)
-        case unknown(type: String)
-
-        static func parse(_ object: [String: Any]) -> Event? {
-            guard let type = object["type"] as? String else { return nil }
-            switch type {
-            case "system":
-                return .system(
-                    sessionId: object["session_id"] as? String,
-                    model: object["model"] as? String,
-                    permissionMode: object["permissionMode"] as? String
-                )
-            case "assistant":
-                let message = object["message"] as? [String: Any] ?? [:]
-                let content = message["content"] as? [[String: Any]] ?? []
-                return .assistant(
-                    uuid: object["uuid"] as? String ?? UUID().uuidString,
-                    contentBlocks: content
-                )
-            case "user":
-                let message = object["message"] as? [String: Any] ?? [:]
-                let content = message["content"] as? [[String: Any]] ?? []
-                return .user(uuid: object["uuid"] as? String ?? UUID().uuidString, contentBlocks: content)
-            case "stream_event":
-                let inner = object["event"] as? [String: Any] ?? [:]
-                return .streamEvent(innerType: inner["type"] as? String ?? "", delta: inner["delta"] as? [String: Any])
-            case "control_request":
-                guard let requestId = object["request_id"] as? String,
-                      let request = object["request"] as? [String: Any]
-                else { return nil }
-                return .controlRequest(requestId: requestId, request: request)
-            case "control_response":
-                let resp = object["response"] as? [String: Any] ?? [:]
-                let inner = resp["response"] as? [String: Any] ?? [:]
-                return .controlResponse(response: inner)
-            case "result":
-                return .result(
-                    isError: object["is_error"] as? Bool ?? false,
-                    modelUsage: object["modelUsage"] as? [String: Any],
-                    sessionId: object["session_id"] as? String
-                )
-            case "rate_limit_event":
-                let info = object["rate_limit_info"] as? [String: Any] ?? [:]
-                let utilization = info["utilization"] as? Double ?? 0
-                let resetsAt = info["resetsAt"] as? TimeInterval
-                return .rateLimitEvent(utilization: utilization, resetsAt: resetsAt)
-            default:
-                return .unknown(type: type)
-            }
-        }
-    }
-
     // MARK: - Encoding Helpers
 
     static func encode(_ value: Encodable) -> Data? {
@@ -215,59 +153,5 @@ enum ClaudeProtocol {
         guard var data = encode(value) else { return nil }
         data.append(0x0A) // newline
         return data
-    }
-}
-
-/// Wrapper to encode arbitrary JSON values from JSONSerialization into Codable.
-private struct AnyCodable: Codable {
-    let value: Any
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let dict = try? container.decode([String: AnyCodable].self) {
-            value = dict.mapValues(\.value)
-        } else if let array = try? container.decode([AnyCodable].self) {
-            value = array.map(\.value)
-        } else if let string = try? container.decode(String.self) {
-            value = string
-        } else if let double = try? container.decode(Double.self) {
-            value = double
-        } else if let bool = try? container.decode(Bool.self) {
-            value = bool
-        } else if container.decodeNil() {
-            value = NSNull()
-        } else {
-            value = NSNull()
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch value {
-        case let dict as [String: Any]:
-            try container.encode(dict.mapValues { AnyCodable(value: $0) })
-        case let array as [Any]:
-            try container.encode(array.map { AnyCodable(value: $0) })
-        case let string as String:
-            try container.encode(string)
-        case let number as NSNumber:
-            if CFBooleanGetTypeID() == CFGetTypeID(number) {
-                try container.encode(number.boolValue)
-            } else {
-                try container.encode(number.doubleValue)
-            }
-        case let int as Int:
-            try container.encode(int)
-        case let double as Double:
-            try container.encode(double)
-        case let bool as Bool:
-            try container.encode(bool)
-        default:
-            try container.encodeNil()
-        }
-    }
-
-    init(value: Any) {
-        self.value = value
     }
 }

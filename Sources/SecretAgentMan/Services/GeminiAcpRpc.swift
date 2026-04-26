@@ -1,63 +1,5 @@
 import Foundation
 
-/// Loose JSON value used for protocol-level fields whose schema is `unknown`
-/// (e.g. `rawInput`, `rawOutput`, `_meta`) and for staged decoding of
-/// incoming frames before the concrete payload type is known.
-enum GeminiAcpJsonValue: Codable, Equatable {
-    case null
-    case bool(Bool)
-    case int(Int)
-    case double(Double)
-    case string(String)
-    case array([Self])
-    case object([String: Self])
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if container.decodeNil() {
-            self = .null
-        } else if let value = try? container.decode(Bool.self) {
-            self = .bool(value)
-        } else if let value = try? container.decode(Int.self) {
-            self = .int(value)
-        } else if let value = try? container.decode(Double.self) {
-            self = .double(value)
-        } else if let value = try? container.decode(String.self) {
-            self = .string(value)
-        } else if let value = try? container.decode([Self].self) {
-            self = .array(value)
-        } else if let value = try? container.decode([String: Self].self) {
-            self = .object(value)
-        } else {
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "Unsupported JSON value"
-            )
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .null: try container.encodeNil()
-        case let .bool(value): try container.encode(value)
-        case let .int(value): try container.encode(value)
-        case let .double(value): try container.encode(value)
-        case let .string(value): try container.encode(value)
-        case let .array(value): try container.encode(value)
-        case let .object(value): try container.encode(value)
-        }
-    }
-
-    /// Re-decode this loose value into a concrete `Decodable` type. Useful
-    /// after reading an incoming frame's `params`/`result` and dispatching by
-    /// method.
-    func decode<T: Decodable>(as type: T.Type) throws -> T {
-        let data = try JSONEncoder().encode(self)
-        return try JSONDecoder().decode(T.self, from: data)
-    }
-}
-
 /// JSON-RPC 2.0 framing for the Gemini ACP wire protocol.
 ///
 /// Communicate over stdio with newline-delimited JSON (no `Content-Length`
@@ -96,7 +38,7 @@ enum GeminiAcpRpc {
     struct ErrorObject: Codable, Equatable {
         let code: Int
         let message: String
-        let data: GeminiAcpJsonValue?
+        let data: JSONValue?
     }
 
     /// Outgoing request envelope. `Params` must be `Encodable`.
@@ -161,7 +103,7 @@ enum GeminiAcpRpc {
     ///   - `.request`: has an `id` and a `method`. The agent expects a reply.
     ///   - `.notification`: has a `method` but no `id`. Fire-and-forget.
     ///
-    /// `params`/`result` are kept as raw `GeminiAcpJsonValue` so callers can
+    /// `params`/`result` are kept as raw `JSONValue` so callers can
     /// decode them into a concrete typed payload once the method/id is known.
     enum IncomingFrame: Equatable {
         case response(IncomingResponse)
@@ -171,19 +113,19 @@ enum GeminiAcpRpc {
 
     struct IncomingResponse: Equatable {
         let id: Id
-        let result: GeminiAcpJsonValue?
+        let result: JSONValue?
         let error: ErrorObject?
     }
 
     struct IncomingRequest: Equatable {
         let id: Id
         let method: String
-        let params: GeminiAcpJsonValue?
+        let params: JSONValue?
     }
 
     struct IncomingNotification: Equatable {
         let method: String
-        let params: GeminiAcpJsonValue?
+        let params: JSONValue?
     }
 
     /// Parses a single newline-delimited JSON frame into an `IncomingFrame`.
@@ -207,8 +149,8 @@ enum GeminiAcpRpc {
         let jsonrpc: String?
         let id: Id?
         let method: String?
-        let params: GeminiAcpJsonValue?
-        let result: GeminiAcpJsonValue?
+        let params: JSONValue?
+        let result: JSONValue?
         let error: ErrorObject?
     }
 }

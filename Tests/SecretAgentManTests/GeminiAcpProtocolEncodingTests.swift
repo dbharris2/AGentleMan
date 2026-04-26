@@ -119,12 +119,12 @@ struct GeminiAcpProtocolEncodingTests {
         #expect(call.status == .inProgress)
     }
 
-    // MARK: - End-to-end via JsonValue (the production decode path)
+    // MARK: - End-to-end via JSONValue (the production decode path)
 
     @Test func sessionUpdateDecodesViaJsonValueRetrip() throws {
-        // The Observer reads `params` as a `GeminiAcpJsonValue` and then
+        // The Observer reads `params` as a `JSONValue` and then
         // re-decodes it as a typed payload. This test exercises that exact
-        // hop so a regression in JsonValue (e.g. Int/Double conflation) is
+        // hop so a regression in JSONValue (e.g. Int/Double conflation) is
         // caught.
         let raw = #"""
         {
@@ -136,7 +136,7 @@ struct GeminiAcpProtocolEncodingTests {
         }
         """#
         let data = try #require(raw.data(using: .utf8))
-        let value = try JSONDecoder().decode(GeminiAcpJsonValue.self, from: data)
+        let value = try JSONDecoder().decode(JSONValue.self, from: data)
         let parsed = try value.decode(as: GeminiAcpProtocol.SessionNotification.self)
         if case let .agentMessageChunk(chunk) = parsed.update,
            case let .text(text) = chunk.content {

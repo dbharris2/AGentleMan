@@ -1,4 +1,11 @@
 // swiftlint:disable file_length
+//
+// Follow-up: extract the static parsing helpers (transcriptItems,
+// hydrateTranscriptItems, toolUseSummary, todoWriteSummary, formatToolInput,
+// unwrapSlashCommand, friendlyModelName) into ClaudeStreamMonitor+Parsing.swift.
+// They account for ~300 lines and are pure functions over typed
+// ClaudeProtocol values, so they extract cleanly. Out of scope for the
+// protocol-typing work tracked in docs/claude-protocol-sdk-plan.md.
 import Foundation
 import Observation
 
@@ -218,13 +225,12 @@ final class ClaudeStreamMonitor {
         emit(.metadataUpdated(update), for: id)
     }
 
-    private func applySlashCommands(_ commands: [[String: Any]]) {
-        slashCommands = commands.compactMap { dict in
-            guard let name = dict["name"] as? String else { return nil }
-            return SlashCommand(
-                name: name,
-                description: dict["description"] as? String ?? "",
-                argumentHint: dict["argumentHint"] as? String ?? ""
+    private func applySlashCommands(_ commands: [ClaudeProtocol.SlashCommand]) {
+        slashCommands = commands.map { command in
+            SlashCommand(
+                name: command.name,
+                description: command.description ?? "",
+                argumentHint: command.argumentHint ?? ""
             )
         }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         // Fan out to every monitored agent — Claude's slash-command list is
@@ -250,52 +256,32 @@ final class ClaudeStreamMonitor {
 
         var items: [CodexTranscriptItem] = []
         for line in content.split(separator: "\n") {
-            guard let lineData = line.data(using: .utf8),
-                  let object = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  let type = object["type"] as? String
-            else { continue }
+            guard let event = try? ClaudeProtocol.decodeLine(String(line)) else { continue }
 
-            switch type {
-            case "assistant":
-                items.append(contentsOf: transcriptItems(fromAssistantEvent: object))
-            case "user":
-                // During hydration, check if this is a user-typed message or a tool result.
-                // User-typed messages have "userType" field; tool results don't.
-                if object["userType"] != nil {
+            switch event {
+            case let .assistant(message):
+                items.append(contentsOf: transcriptItems(fromAssistantEvent: message))
+            case let .user(message):
+                // User-typed messages have a `userType`; tool results don't.
+                if message.userType != nil {
                     // Skip CLI-injected meta messages (slash-command skill bodies, image
                     // placeholders). Live streaming never surfaces these; hydration shouldn't either.
-                    if object["isMeta"] as? Bool == true { continue }
-                    if let message = object["message"] as? [String: Any] {
-                        let text: String
-                        if let str = message["content"] as? String {
-                            text = str.trimmingCharacters(in: .whitespacesAndNewlines)
-                        } else if let blocks = message["content"] as? [[String: Any]] {
-                            text = blocks.compactMap { block -> String? in
-                                guard block["type"] as? String == "text" else { return nil }
-                                return block["text"] as? String
-                            }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
-                        } else {
-                            continue
-                        }
-                        guard !text.isEmpty else { continue }
+                    if message.isMeta == true { continue }
+                    let text = userTypedText(from: message)
+                    guard !text.isEmpty else { continue }
+                    items.append(CodexTranscriptItem(
+                        id: message.uuid ?? UUID().uuidString,
+                        role: .user,
+                        text: unwrapSlashCommand(text)
+                    ))
+                } else if case let .blocks(blocks) = message.message?.content {
+                    // Tool result — only surface errors during hydration.
+                    for block in blocks {
+                        guard case let .toolResult(result) = block, result.isError == true else { continue }
+                        guard !result.text.isEmpty else { continue }
                         items.append(CodexTranscriptItem(
-                            id: object["uuid"] as? String ?? UUID().uuidString,
-                            role: .user,
-                            text: unwrapSlashCommand(text)
+                            id: UUID().uuidString, role: .system, text: "Error: \(result.text)"
                         ))
-                    }
-                } else {
-                    // Tool result — only surface errors during hydration
-                    if let message = object["message"] as? [String: Any],
-                       let blocks = message["content"] as? [[String: Any]] {
-                        for block in blocks where block["is_error"] as? Bool == true {
-                            let text = block["content"] as? String ?? ""
-                            if !text.isEmpty {
-                                items.append(CodexTranscriptItem(
-                                    id: UUID().uuidString, role: .system, text: "Error: \(text)"
-                                ))
-                            }
-                        }
                     }
                 }
             default:
@@ -303,6 +289,20 @@ final class ClaudeStreamMonitor {
             }
         }
         return items
+    }
+
+    private nonisolated static func userTypedText(from message: ClaudeProtocol.MessageEvent) -> String {
+        guard let content = message.message?.content else { return "" }
+        switch content {
+        case let .text(str):
+            return str.trimmingCharacters(in: .whitespacesAndNewlines)
+        case let .blocks(blocks):
+            let joined = blocks.compactMap { block -> String? in
+                if case let .text(t) = block { return t }
+                return nil
+            }.joined()
+            return joined.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 
     func stopAll() {
@@ -379,61 +379,45 @@ final class ClaudeStreamMonitor {
     nonisolated static func approvalRequest(
         agentId: UUID,
         requestId: String,
-        request: [String: Any]
-    ) -> ClaudeApprovalRequest? {
-        guard request["subtype"] as? String == "can_use_tool",
-              let toolName = request["tool_name"] as? String
-        else { return nil }
-
-        let displayName = request["display_name"] as? String ?? toolName
-        let input = request["input"] as? [String: Any]
-        let inputDescription = input.map { formatToolInput($0) } ?? ""
-
-        return ClaudeApprovalRequest(
+        permission: ClaudeProtocol.PermissionRequest
+    ) -> ClaudeApprovalRequest {
+        ClaudeApprovalRequest(
             agentId: agentId,
             requestId: requestId,
-            toolName: toolName,
-            displayName: displayName,
-            inputDescription: inputDescription
+            toolName: permission.toolName,
+            displayName: permission.displayName ?? permission.toolName,
+            inputDescription: formatToolInput(permission.input)
         )
     }
 
     nonisolated static func transcriptItems(
-        fromAssistantEvent event: [String: Any]
+        fromAssistantEvent message: ClaudeProtocol.MessageEvent
     ) -> [CodexTranscriptItem] {
-        guard let message = event["message"] as? [String: Any],
-              let content = message["content"] as? [[String: Any]]
-        else { return [] }
-
-        let baseId = event["uuid"] as? String ?? UUID().uuidString
+        guard case let .blocks(blocks) = message.message?.content else { return [] }
+        let baseId = message.uuid ?? UUID().uuidString
         var items: [CodexTranscriptItem] = []
 
-        for (index, block) in content.enumerated() {
-            let blockType = block["type"] as? String ?? ""
-            switch blockType {
-            case "text":
-                if let text = block["text"] as? String,
-                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    items.append(CodexTranscriptItem(
-                        id: "\(baseId)-text-\(index)",
-                        role: .assistant,
-                        text: text
-                    ))
-                }
-            case "tool_use":
-                let name = block["name"] as? String ?? "Tool"
-                let input = block["input"] as? [String: Any]
-                let summary = toolUseSummary(name: name, input: input)
+        for (index, block) in blocks.enumerated() {
+            switch block {
+            case let .text(text):
+                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                items.append(CodexTranscriptItem(
+                    id: "\(baseId)-text-\(index)",
+                    role: .assistant,
+                    text: text
+                ))
+            case let .toolUse(use):
+                let summary = toolUseSummary(use: use)
                 // AskUserQuestion and TodoWrite are Claude communicating with the user —
                 // show as assistant messages so they aren't collapsed into the tool drawer.
-                let role: CodexTranscriptRole = (name == "AskUserQuestion" || name == "TodoWrite") ? .assistant : .system
+                let role: CodexTranscriptRole = (use.name == "AskUserQuestion" || use.name == "TodoWrite") ? .assistant : .system
                 items.append(CodexTranscriptItem(
                     id: "\(baseId)-tool-\(index)",
                     role: role,
                     text: summary,
-                    toolName: name
+                    toolName: use.name
                 ))
-            default:
+            case .toolResult, .unknown:
                 break
             }
         }
@@ -468,76 +452,66 @@ final class ClaudeStreamMonitor {
         return name
     }
 
-    private nonisolated static func toolUseSummary(name: String, input: [String: Any]?) -> String {
-        switch name {
+    private nonisolated static func toolUseSummary(use: ClaudeProtocol.ToolUse) -> String {
+        let input = use.input
+        switch use.name {
         case "Bash":
-            let cmd = input?["command"] as? String ?? ""
+            let cmd = input?["command"]?.stringValue ?? ""
             let truncated = cmd.count > 200 ? String(cmd.prefix(200)) + "…" : cmd
             return "💻 **Bash**: `\(truncated)`"
         case "Read":
-            let path = input?["file_path"] as? String ?? ""
-            return "👀 **Read**: \(path)"
+            return "👀 **Read**: \(input?["file_path"]?.stringValue ?? "")"
         case "Write":
-            let path = input?["file_path"] as? String ?? ""
-            return "✏️ **Write**: \(path)"
+            return "✏️ **Write**: \(input?["file_path"]?.stringValue ?? "")"
         case "Edit":
-            let path = input?["file_path"] as? String ?? ""
-            return "📝 **Edit**: \(path)"
+            return "📝 **Edit**: \(input?["file_path"]?.stringValue ?? "")"
         case "Grep":
-            let pattern = input?["pattern"] as? String ?? ""
-            return "🔍 **Grep**: `\(pattern)`"
+            return "🔍 **Grep**: `\(input?["pattern"]?.stringValue ?? "")`"
         case "Glob":
-            let pattern = input?["pattern"] as? String ?? ""
-            return "🗂️ **Glob**: `\(pattern)`"
+            return "🗂️ **Glob**: `\(input?["pattern"]?.stringValue ?? "")`"
         case "AskUserQuestion":
-            if let questions = input?["questions"] as? [[String: Any]],
-               let first = questions.first,
-               let question = first["question"] as? String {
+            if let question = input?["questions"]?.arrayValue?.first?["question"]?.stringValue {
                 return "❓ **Question**: \(question)"
             }
             return "❓ **Question**"
         case "TodoWrite":
             return todoWriteSummary(input: input)
         case "ToolSearch":
-            let query = input?["query"] as? String ?? ""
-            return "🧰 **ToolSearch**: `\(query)`"
+            return "🧰 **ToolSearch**: `\(input?["query"]?.stringValue ?? "")`"
         case "Agent":
-            let desc = input?["description"] as? String ?? ""
-            return "🤖 **Agent**: \(desc)"
+            return "🤖 **Agent**: \(input?["description"]?.stringValue ?? "")"
         case "WebFetch":
-            let url = input?["url"] as? String ?? ""
-            return "🌐 **WebFetch**: \(url)"
+            return "🌐 **WebFetch**: \(input?["url"]?.stringValue ?? "")"
         case "WebSearch":
-            let query = input?["query"] as? String ?? ""
-            return "🔎 **WebSearch**: `\(query)`"
+            return "🔎 **WebSearch**: `\(input?["query"]?.stringValue ?? "")`"
         case "TaskCreate", "TaskUpdate":
-            let subject = input?["subject"] as? String ?? input?["taskId"] as? String ?? ""
-            return "✨ **\(name)**: \(subject)"
+            let subject = input?["subject"]?.stringValue ?? input?["taskId"]?.stringValue ?? ""
+            return "✨ **\(use.name)**: \(subject)"
         default:
-            if let input, !input.isEmpty {
-                let summary = input.prefix(3).map { "\($0.key): \($0.value)" }.joined(separator: ", ")
+            if let dict = input?.objectValue, !dict.isEmpty {
+                let summary = dict.prefix(3).map { "\($0.key): \($0.value)" }.joined(separator: ", ")
                 let truncated = summary.count > 100 ? String(summary.prefix(100)) + "…" : summary
-                return "⚙️ **\(name)**: \(truncated)"
+                return "⚙️ **\(use.name)**: \(truncated)"
             }
-            return "⚙️ **\(name)**"
+            return "⚙️ **\(use.name)**"
         }
     }
 
-    private nonisolated static func todoWriteSummary(input: [String: Any]?) -> String {
-        guard let todos = input?["todos"] as? [[String: Any]], !todos.isEmpty else {
+    private nonisolated static func todoWriteSummary(input: JSONValue?) -> String {
+        guard let todos = input?["todos"]?.arrayValue, !todos.isEmpty else {
             return "**TODO list**"
         }
-        let completed = todos.count(where: { ($0["status"] as? String) == "completed" })
-        let inProgress = todos.count(where: { ($0["status"] as? String) == "in_progress" })
+        let completed = todos.count(where: { $0["status"]?.stringValue == "completed" })
+        let inProgress = todos.count(where: { $0["status"]?.stringValue == "in_progress" })
         var segments: [String] = []
         if inProgress > 0 { segments.append("\(inProgress) in progress") }
         segments.append("\(completed)/\(todos.count) complete")
         let header = "**TODO list** (\(segments.joined(separator: ", ")))"
 
         let rows = todos.map { todo -> String in
-            let status = todo["status"] as? String ?? "pending"
-            let content = todo["content"] as? String ?? ""
-            let activeForm = todo["activeForm"] as? String ?? content
+            let status = todo["status"]?.stringValue ?? "pending"
+            let content = todo["content"]?.stringValue ?? ""
+            let activeForm = todo["activeForm"]?.stringValue ?? content
             switch status {
             case "completed": return "- ✅ \(content)"
             case "in_progress": return "- 🔄 **\(activeForm)**"
@@ -563,9 +537,10 @@ final class ClaudeStreamMonitor {
         return name.capitalized + contextSuffix
     }
 
-    private nonisolated static func formatToolInput(_ input: [String: Any]) -> String {
-        input.map { key, value in
-            let valueStr = if let str = value as? String {
+    private nonisolated static func formatToolInput(_ input: JSONValue) -> String {
+        guard case let .object(dict) = input else { return "" }
+        return dict.map { key, value in
+            let valueStr: String = if case let .string(str) = value {
                 str.count > 200 ? String(str.prefix(200)) + "..." : str
             } else {
                 String(describing: value)
@@ -591,18 +566,18 @@ private struct ObserverDelegate {
     let activeToolChanged: (UUID, String?) -> Void
     let permissionModeChanged: (UUID, String) -> Void
     let modelInfo: (UUID, String, Double) -> Void
-    let slashCommands: ([[String: Any]]) -> Void
+    let slashCommands: ([ClaudeProtocol.SlashCommand]) -> Void
     let sessionConflict: (UUID) -> Void
 }
 
 private struct PendingApproval {
     let requestId: String
-    let toolInput: [String: Any]
+    let toolInput: JSONValue
 }
 
 private struct PendingElicitation {
     let requestId: String
-    let toolInput: [String: Any]
+    let toolInput: JSONValue
     let questionText: String
 }
 
@@ -778,7 +753,7 @@ private final class Observer: @unchecked Sendable {
         }
     }
 
-    private func sendPermissionResponse(requestId: String, allow: Bool, toolInput: [String: Any]) {
+    private func sendPermissionResponse(requestId: String, allow: Bool, toolInput: JSONValue) {
         let message = if allow {
             ClaudeProtocol.PermissionResponse.allow(requestId: requestId, updatedInput: toolInput)
         } else {
@@ -884,41 +859,49 @@ private final class Observer: @unchecked Sendable {
     }
 
     private func handleJSONLine(_ line: String) {
-        guard let data = line.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let eventType = object["type"] as? String
-        else { return }
+        let event: ClaudeProtocol.Event?
+        do {
+            event = try ClaudeProtocol.decodeLine(line)
+        } catch {
+            // Skip and log — one bad line shouldn't kill the stream.
+            // Note: malformed control_request frames can leave the user waiting
+            // on an approval that never arrives; surface those explicitly when
+            // typed payloads land in Phase 2.
+            NSLog("[Claude] dropped malformed JSONL: \(error)")
+            return
+        }
+        guard let event else { return }
 
-        switch eventType {
-        case "system":
-            handleSystemEvent(object)
-        case "assistant":
-            handleAssistantEvent(object)
-        case "user":
-            handleUserEvent(object)
-        case "stream_event":
-            handleStreamEvent(object)
-        case "control_request":
-            handleControlRequest(object)
-        case "control_response":
-            handleControlResponse(object)
-        case "result":
-            handleResultEvent(object)
-        default:
+        switch event {
+        case let .system(system):
+            handleSystemEvent(system)
+        case let .assistant(message):
+            handleAssistantEvent(message)
+        case let .user(message):
+            handleUserEvent(message)
+        case let .streamEvent(stream):
+            handleStreamEvent(stream)
+        case let .controlRequest(controlEvent):
+            handleControlRequest(controlEvent)
+        case let .controlResponse(response):
+            handleControlResponse(response)
+        case let .result(result):
+            handleResultEvent(result)
+        case .unknown:
             break
         }
     }
 
     // MARK: - Event Handlers
 
-    private func handleSystemEvent(_ event: [String: Any]) {
-        if let sessionId = event["session_id"] as? String, !sessionId.isEmpty {
+    private func handleSystemEvent(_ event: ClaudeProtocol.SystemEvent) {
+        if let sessionId = event.sessionId, !sessionId.isEmpty {
             delegate.sessionReady(agent.id, sessionId)
         }
-        if let model = event["model"] as? String {
+        if let model = event.model {
             delegate.modelInfo(agent.id, ClaudeStreamMonitor.friendlyModelName(model), 0)
         }
-        if let mode = event["permissionMode"] as? String {
+        if let mode = event.permissionMode {
             delegate.permissionModeChanged(agent.id, mode)
         }
         // Don't publish .active here — system events are metadata (session info,
@@ -927,69 +910,63 @@ private final class Observer: @unchecked Sendable {
         // spuriously show the "thinking" indicator on permission mode changes.
     }
 
-    private func handleAssistantEvent(_ event: [String: Any]) {
+    private func handleAssistantEvent(_ message: ClaudeProtocol.MessageEvent) {
         finalizeStreaming()
 
-        for item in ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: event) {
+        for item in ClaudeStreamMonitor.transcriptItems(fromAssistantEvent: message) {
             delegate.transcriptItem(agent.id, item)
         }
         publishIfChanged(.active)
     }
 
-    private func handleUserEvent(_ event: [String: Any]) {
+    private func handleUserEvent(_ message: ClaudeProtocol.MessageEvent) {
         // Only surface error tool results — successful results are noise.
         // The "thinking" bubble covers the gap while tools execute.
-        guard let message = event["message"] as? [String: Any],
-              let content = message["content"] as? [[String: Any]]
-        else { return }
+        guard case let .blocks(blocks) = message.message?.content else { return }
 
-        for block in content {
-            let isError = block["is_error"] as? Bool ?? false
-            guard isError else { continue }
-            let text = block["content"] as? String ?? block["text"] as? String ?? ""
-            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+        for block in blocks {
+            guard case let .toolResult(result) = block, result.isError == true else { continue }
+            let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let truncated = trimmed.count > 500 ? String(trimmed.prefix(500)) + "…" : trimmed
             let item = CodexTranscriptItem(
                 id: UUID().uuidString,
                 role: .system,
-                text: "Error: \(text.count > 500 ? String(text.prefix(500)) + "…" : text)"
+                text: "Error: \(truncated)"
             )
             delegate.transcriptItem(agent.id, item)
         }
     }
 
-    private func handleStreamEvent(_ event: [String: Any]) {
-        guard let inner = event["event"] as? [String: Any],
-              let innerType = inner["type"] as? String
-        else { return }
-
-        // Track active tool from content_block_start events
-        if innerType == "content_block_start",
-           let block = inner["content_block"] as? [String: Any],
-           let blockType = block["type"] as? String {
-            if blockType == "tool_use", let name = block["name"] as? String {
-                delegate.activeToolChanged(agent.id, name)
-            } else if blockType == "text" {
+    private func handleStreamEvent(_ stream: ClaudeProtocol.StreamEvent) {
+        switch stream {
+        case let .contentBlockStart(start):
+            switch start.contentBlock {
+            case .text:
                 delegate.activeToolChanged(agent.id, nil)
+            case let .toolUse(name):
+                if let name {
+                    delegate.activeToolChanged(agent.id, name)
+                }
+            case .unknown:
+                break
             }
-        }
 
-        if innerType == "content_block_delta",
-           let delta = inner["delta"] as? [String: Any],
-           let deltaType = delta["type"] as? String,
-           deltaType == "text_delta",
-           let text = delta["text"] as? String {
+        case let .textDelta(text):
+            guard !text.isEmpty else { break }
             currentStreamingText.append(text)
-
             let now = Date()
             if now.timeIntervalSince(lastStreamingFlush) > 0.05 {
                 lastStreamingFlush = now
                 delegate.streamingText(agent.id, currentStreamingText)
             }
-        }
 
-        if innerType == "message_stop" {
+        case .messageStop:
             finalizeStreaming()
             delegate.activeToolChanged(agent.id, nil)
+
+        case .unknown:
+            break
         }
 
         // Don't overwrite needsPermission/awaitingResponse — stream events
@@ -999,29 +976,21 @@ private final class Observer: @unchecked Sendable {
         }
     }
 
-    private func handleControlRequest(_ event: [String: Any]) {
-        guard let requestId = event["request_id"] as? String,
-              let request = event["request"] as? [String: Any],
-              let subtype = request["subtype"] as? String
-        else { return }
+    private func handleControlRequest(_ event: ClaudeProtocol.ControlRequestEvent) {
+        let requestId = event.requestId
 
-        switch subtype {
-        case "can_use_tool":
-            let toolName = request["tool_name"] as? String ?? ""
-            let toolInput = request["input"] as? [String: Any] ?? [:]
-
+        switch event.request {
+        case let .canUseTool(permission):
             // AskUserQuestion: show options as buttons, fall back to composer for freeform
-            if toolName == "AskUserQuestion" {
-                let questions = toolInput["questions"] as? [[String: Any]] ?? []
-                let firstQuestion = questions.first ?? [:]
-                let questionText = firstQuestion["question"] as? String ?? "Input requested"
-                let optionDicts = firstQuestion["options"] as? [[String: Any]] ?? []
-                let options = optionDicts.compactMap { dict -> CodexUserInputOption? in
-                    guard let label = dict["label"] as? String else { return nil }
-                    return CodexUserInputOption(label: label, description: dict["description"] as? String ?? "")
+            if permission.toolName == "AskUserQuestion" {
+                let parsed = try? permission.input.decode(as: ClaudeProtocol.AskUserQuestionInput.self)
+                let firstQuestion = parsed?.questions.first
+                let questionText = firstQuestion?.question ?? "Input requested"
+                let options = (firstQuestion?.options ?? []).map { option in
+                    CodexUserInputOption(label: option.label, description: option.description ?? "")
                 }
                 pendingElicitation = PendingElicitation(
-                    requestId: requestId, toolInput: toolInput, questionText: questionText
+                    requestId: requestId, toolInput: permission.input, questionText: questionText
                 )
                 let elicitation = ClaudeElicitationRequest(
                     agentId: agent.id,
@@ -1034,27 +1003,26 @@ private final class Observer: @unchecked Sendable {
                 return
             }
 
-            guard let approval = ClaudeStreamMonitor.approvalRequest(
+            let approval = ClaudeStreamMonitor.approvalRequest(
                 agentId: agent.id,
                 requestId: requestId,
-                request: request
-            ) else { return }
-            pendingApproval = PendingApproval(requestId: requestId, toolInput: toolInput)
+                permission: permission
+            )
+            pendingApproval = PendingApproval(requestId: requestId, toolInput: permission.input)
             delegate.approvalRequest(agent.id, approval)
             publishIfChanged(.needsPermission)
 
-        case "elicitation":
-            let message = request["message"] as? String ?? "Input requested"
+        case let .elicitation(elic):
             let elicitation = ClaudeElicitationRequest(
                 agentId: agent.id,
                 requestId: requestId,
-                message: message,
+                message: elic.message,
                 options: []
             )
             delegate.elicitationRequest(agent.id, elicitation)
             publishIfChanged(.needsPermission)
 
-        default:
+        case .unknown:
             break
         }
     }
@@ -1063,8 +1031,18 @@ private final class Observer: @unchecked Sendable {
         queue.async { [weak self] in
             guard let self, let pending = self.pendingElicitation else { return }
 
+            // Echo Claude's original input verbatim, with `answers` merged in.
+            // Tool input is always an `.object` from Claude — fall back to a
+            // fresh object if it's not, so a misshapen input still produces a
+            // valid permission response.
+            let answers = JSONValue.object([pending.questionText: .string(answer)])
             var modified = pending.toolInput
-            modified["answers"] = [pending.questionText: answer]
+            if case var .object(dict) = modified {
+                dict["answers"] = answers
+                modified = .object(dict)
+            } else {
+                modified = .object(["answers": answers])
+            }
 
             self.pendingElicitation = nil
             self.sendPermissionResponse(requestId: requestId, allow: true, toolInput: modified)
@@ -1073,39 +1051,21 @@ private final class Observer: @unchecked Sendable {
         }
     }
 
-    private func handleControlResponse(_ event: [String: Any]) {
-        guard let response = event["response"] as? [String: Any],
-              let inner = response["response"] as? [String: Any]
-        else { return }
-
-        if let commands = inner["commands"] as? [[String: Any]] {
+    private func handleControlResponse(_ event: ClaudeProtocol.ControlResponseEvent) {
+        if let commands = event.commands {
             delegate.slashCommands(commands)
         }
     }
 
-    private func handleResultEvent(_ event: [String: Any]) {
+    private func handleResultEvent(_ event: ClaudeProtocol.ResultEvent) {
         finalizeStreaming()
 
-        // Context window % from the last API call's actual token consumption.
-        // modelUsage is cumulative across the session, so use usage.iterations instead.
-        if let modelUsage = event["modelUsage"] as? [String: Any],
-           let firstUsage = modelUsage.values.first as? [String: Any],
-           let contextWindow = firstUsage["contextWindow"] as? Double, contextWindow > 0,
-           let usage = event["usage"] as? [String: Any],
-           let iterations = usage["iterations"] as? [[String: Any]],
-           let lastIter = iterations.last {
-            let input = lastIter["input_tokens"] as? Double ?? 0
-            let cacheRead = lastIter["cache_read_input_tokens"] as? Double ?? 0
-            let cacheCreate = lastIter["cache_creation_input_tokens"] as? Double ?? 0
-            let output = lastIter["output_tokens"] as? Double ?? 0
-            let pct = (input + cacheRead + cacheCreate + output) / contextWindow * 100
+        if let pct = event.contextPercent {
             delegate.modelInfo(agent.id, "", pct)
         }
 
         delegate.activeToolChanged(agent.id, nil)
-
-        let isError = event["is_error"] as? Bool ?? false
-        publishIfChanged(isError ? .error : .awaitingInput)
+        publishIfChanged(event.isError == true ? .error : .awaitingInput)
     }
 
     // MARK: - Streaming Helpers

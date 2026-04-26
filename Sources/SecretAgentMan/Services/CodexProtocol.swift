@@ -8,16 +8,16 @@ enum CodexProtocol {
     struct RPCRequest: Encodable {
         let id: Int
         let method: String
-        let params: [String: AnyCodableValue]
+        let params: [String: JSONValue]
 
         static func initialize(id: Int) -> RPCRequest {
             RPCRequest(id: id, method: "initialize", params: [
-                "clientInfo": .dict([
+                "clientInfo": .object([
                     "name": .string("secret-agent-man"),
                     "title": .string("SecretAgentMan"),
                     "version": .string("0.1.0"),
                 ]),
-                "capabilities": .dict([
+                "capabilities": .object([
                     "experimentalApi": .bool(true),
                 ]),
             ])
@@ -51,19 +51,19 @@ enum CodexProtocol {
             threadId: String,
             text: String,
             imagePaths: [String] = [],
-            collaborationMode: [String: AnyCodableValue] = [:]
+            collaborationMode: [String: JSONValue] = [:]
         ) -> RPCRequest {
-            var input: [AnyCodableValue] = imagePaths.map { path in
-                .dict(["type": .string("localImage"), "path": .string(path)])
+            var input: [JSONValue] = imagePaths.map { path in
+                .object(["type": .string("localImage"), "path": .string(path)])
             }
-            input.append(.dict(["type": .string("text"), "text": .string(text)]))
+            input.append(.object(["type": .string("text"), "text": .string(text)]))
 
-            var params: [String: AnyCodableValue] = [
+            var params: [String: JSONValue] = [
                 "threadId": .string(threadId),
                 "input": .array(input),
             ]
             if !collaborationMode.isEmpty {
-                params["collaborationMode"] = .dict(collaborationMode)
+                params["collaborationMode"] = .object(collaborationMode)
             }
             return RPCRequest(id: id, method: "turn/start", params: params)
         }
@@ -71,7 +71,7 @@ enum CodexProtocol {
 
     struct RPCResponse: Encodable {
         let id: Int
-        let result: [String: AnyCodableValue]
+        let result: [String: JSONValue]
 
         static func approvalDecision(id: Int, accept: Bool) -> RPCResponse {
             RPCResponse(id: id, result: [
@@ -81,12 +81,12 @@ enum CodexProtocol {
 
         static func userInputAnswers(id: Int, answers: [String: [String: [String]]]) -> RPCResponse {
             let encoded = answers.mapValues { inner in
-                AnyCodableValue.dict(inner.mapValues { arr in
-                    AnyCodableValue.array(arr.map { .string($0) })
+                JSONValue.object(inner.mapValues { arr in
+                    JSONValue.array(arr.map { .string($0) })
                 })
             }
             return RPCResponse(id: id, result: [
-                "answers": .dict(encoded),
+                "answers": .object(encoded),
             ])
         }
     }
@@ -233,29 +233,5 @@ enum CodexProtocol {
         guard var data = encode(value) else { return nil }
         data.append(0x0A)
         return data
-    }
-}
-
-/// A type-safe JSON value that can be encoded without [String: Any] casts.
-enum AnyCodableValue: Encodable {
-    case string(String)
-    case int(Int)
-    case double(Double)
-    case bool(Bool)
-    case null
-    case array([AnyCodableValue])
-    case dict([String: AnyCodableValue])
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case let .string(v): try container.encode(v)
-        case let .int(v): try container.encode(v)
-        case let .double(v): try container.encode(v)
-        case let .bool(v): try container.encode(v)
-        case .null: try container.encodeNil()
-        case let .array(v): try container.encode(v)
-        case let .dict(v): try container.encode(v)
-        }
     }
 }
