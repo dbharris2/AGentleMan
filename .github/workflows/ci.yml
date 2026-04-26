@@ -5,25 +5,31 @@ on:
   push:
     branches: [main]
 
-env:
-  SWIFTLINT_VERSION: 0.63.2
-  SWIFTFORMAT_VERSION: 0.59.1
-
 jobs:
   lint:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install SwiftLint
+      - name: Read pinned versions from Mintfile
+        id: versions
         run: |
-          curl -sL "https://github.com/realm/SwiftLint/releases/download/$SWIFTLINT_VERSION/portable_swiftlint.zip" -o swiftlint.zip
+          echo "swiftlint=$(grep '^realm/SwiftLint@' Mintfile | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
+          echo "swiftformat=$(grep '^nicklockwood/SwiftFormat@' Mintfile | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Install SwiftLint
+        env:
+          VERSION: ${{ steps.versions.outputs.swiftlint }}
+        run: |
+          curl -sL "https://github.com/realm/SwiftLint/releases/download/$VERSION/portable_swiftlint.zip" -o swiftlint.zip
           unzip -q swiftlint.zip -d swiftlint
           sudo mv swiftlint/swiftlint /usr/local/bin/
 
       - name: Install SwiftFormat
+        env:
+          VERSION: ${{ steps.versions.outputs.swiftformat }}
         run: |
-          curl -sL "https://github.com/nicklockwood/SwiftFormat/releases/download/$SWIFTFORMAT_VERSION/swiftformat.zip" -o swiftformat.zip
+          curl -sL "https://github.com/nicklockwood/SwiftFormat/releases/download/$VERSION/swiftformat.zip" -o swiftformat.zip
           unzip -q swiftformat.zip
           sudo mv swiftformat /usr/local/bin/
 

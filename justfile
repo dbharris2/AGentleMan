@@ -4,6 +4,10 @@
 default:
     @just --list
 
+# Install pinned dev tools (SwiftLint, SwiftFormat) via mint
+bootstrap:
+    mint bootstrap
+
 # Generate Xcode project from project.yml
 generate:
     xcodegen generate
@@ -24,16 +28,16 @@ open:
 
 # Run SwiftFormat to auto-fix formatting
 format:
-    swiftformat .
+    mint run swiftformat .
 
 # Run SwiftLint with auto-fix
 lint-fix:
-    swiftlint --fix
+    mint run swiftlint --fix
 
 # Check formatting and linting without modifying files
 lint:
-    swiftformat . --lint
-    swiftlint
+    mint run swiftformat . --lint
+    mint run swiftlint
 
 # Scan for unused code with Periphery (config in .periphery.yml)
 periphery: generate
