@@ -39,18 +39,20 @@ A macOS app for managing Claude Code and Codex agent sessions with a native chat
 ## Setup
 
 ```bash
-brew install xcodegen just
+brew install xcodegen just mint
+just bootstrap   # installs SwiftLint / SwiftFormat at the versions pinned in Mintfile
 just xcode
 ```
 
 ## Building
 
 ```bash
-just build    # Generate project + build
-just run      # Build + launch app
-just test     # Run unit tests
-just lint     # Check formatting + linting
-just format   # Auto-fix formatting
+just build       # Generate project + build
+just run         # Build + launch app
+just test        # Run unit tests
+just lint        # Check formatting + linting (mint-pinned)
+just format      # Auto-fix formatting (mint-pinned)
+just periphery   # Scan for unused code
 ```
 
 ## Installation
