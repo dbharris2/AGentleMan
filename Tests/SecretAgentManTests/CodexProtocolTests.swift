@@ -105,17 +105,17 @@ struct CodexProtocolTests {
         #expect(input[0]["type"] as? String == "text")
     }
 
-    // MARK: - AnyCodableValue
+    // MARK: - JSONValue
 
     @Test
-    func anyCodableValueEncodesAllTypes() throws {
-        let value: [String: AnyCodableValue] = [
+    func jsonValueEncodesAllTypes() throws {
+        let value: [String: JSONValue] = [
             "str": .string("hello"),
             "num": .int(42),
             "dbl": .double(3.14),
             "flag": .bool(true),
             "arr": .array([.string("a"), .int(1)]),
-            "nested": .dict(["key": .string("val")]),
+            "nested": .object(["key": .string("val")]),
         ]
         let data = try #require(try? JSONEncoder().encode(value))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
