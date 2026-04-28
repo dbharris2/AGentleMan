@@ -17,6 +17,8 @@ final class AppCoordinator {
     let geminiMonitor: GeminiAcpMonitor
     let reviewerGroupStore = ReviewerGroupStore()
     @ObservationIgnored private let userDefaults: UserDefaults
+    @ObservationIgnored private var lastInterruptAt: [UUID: Date] = [:]
+    @ObservationIgnored private static let interruptDebounceInterval: TimeInterval = 0.5
 
     // MARK: - UI State
 
@@ -186,6 +188,12 @@ final class AppCoordinator {
 
     func interruptAgent(for agentId: UUID) {
         guard let agent = store.agents.first(where: { $0.id == agentId }) else { return }
+        let now = Date()
+        if let last = lastInterruptAt[agentId],
+           now.timeIntervalSince(last) < Self.interruptDebounceInterval {
+            return
+        }
+        lastInterruptAt[agentId] = now
         let isInFlight = switch agent.state {
         case .active, .needsPermission, .awaitingResponse, .awaitingInput: true
         case .idle, .finished, .error: false

@@ -537,6 +537,10 @@ final class ClaudeStreamMonitor {
         return name.capitalized + contextSuffix
     }
 
+    nonisolated static func stripANSI(_ text: String) -> String {
+        text.replacing(#/\x1B\[[0-9;?]*[A-Za-z]/#, with: "")
+    }
+
     private nonisolated static func formatToolInput(_ input: JSONValue) -> String {
         guard case let .object(dict) = input else { return "" }
         return dict.map { key, value in
@@ -595,6 +599,7 @@ private final class Observer: @unchecked Sendable {
 
     private var stdoutBuffer = Data()
     private var stderrBuffer = Data()
+    private var stderrLineBuffer = Data()
     private var pendingApproval: PendingApproval?
     private var pendingElicitation: PendingElicitation?
     private var pendingMessages: [String] = []
@@ -633,6 +638,7 @@ private final class Observer: @unchecked Sendable {
         queue.sync {
             self.stdoutBuffer = Data()
             self.stderrBuffer = Data()
+            self.stderrLineBuffer = Data()
         }
 
         newStdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -826,7 +832,40 @@ private final class Observer: @unchecked Sendable {
             if self.stderrBuffer.count > 4096 {
                 self.stderrBuffer = self.stderrBuffer.suffix(4096)
             }
+
+            // Real-time line-by-line surfacing for retry/API-error notices
+            // (e.g. "Retrying in 1s · attempt 4/10") that would otherwise stay
+            // hidden until the process exited.
+            self.stderrLineBuffer.append(data)
+            while let nlIndex = self.stderrLineBuffer.firstIndex(of: 0x0A) {
+                let lineData = self.stderrLineBuffer.prefix(upTo: nlIndex)
+                self.stderrLineBuffer.removeSubrange(...nlIndex)
+                guard let raw = String(data: lineData, encoding: .utf8) else { continue }
+                self.handleStderrLine(raw)
+            }
         }
+    }
+
+    private func handleStderrLine(_ raw: String) {
+        let stripped = ClaudeStreamMonitor.stripANSI(raw)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !stripped.isEmpty else { return }
+
+        let truncated = stripped.count > 500 ? String(stripped.prefix(500)) + "…" : stripped
+
+        if stripped.range(of: #"[Rr]etrying.*attempt\s+\d+\s*/\s*\d+"#, options: .regularExpression) != nil {
+            emitSystemTranscript("🔄 \(truncated)")
+            return
+        }
+
+        if stripped.range(of: #"^API Error\b"#, options: .regularExpression) != nil {
+            emitSystemTranscript("⚠️ \(truncated)")
+        }
+    }
+
+    private func emitSystemTranscript(_ text: String) {
+        let item = CodexTranscriptItem(id: UUID().uuidString, role: .system, text: text)
+        delegate.transcriptItem(agent.id, item)
     }
 
     private func consumeStdout(_ data: Data) {
@@ -1055,8 +1094,30 @@ private final class Observer: @unchecked Sendable {
             delegate.modelInfo(agent.id, "", pct)
         }
 
+        if event.isError == true {
+            let item = CodexTranscriptItem(
+                id: UUID().uuidString,
+                role: .system,
+                text: "🛑 **Error**: \(Observer.resultErrorMessage(event))"
+            )
+            delegate.transcriptItem(agent.id, item)
+        }
+
         delegate.activeToolChanged(agent.id, nil)
         publishIfChanged(event.isError == true ? .error : .awaitingInput)
+    }
+
+    private static func resultErrorMessage(_ event: ClaudeProtocol.ResultEvent) -> String {
+        let trimmedResult = event.result?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmedResult.isEmpty {
+            return trimmedResult.count > 500 ? String(trimmedResult.prefix(500)) + "…" : trimmedResult
+        }
+        switch event.subtype {
+        case "error_max_turns": return "Reached the maximum number of turns."
+        case "error_during_execution": return "An error occurred during execution."
+        case let other?: return "Request failed (\(other))."
+        case nil: return "Request failed."
+        }
     }
 
     // MARK: - Streaming Helpers

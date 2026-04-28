@@ -569,6 +569,21 @@ struct ClaudeProtocolTests {
     }
 
     @Test
+    func decodeLineParsesResultSubtypeAndResultText() throws {
+        let line = #"""
+        {"type":"result","is_error":true,"subtype":"error_during_execution","result":"boom"}
+        """#
+        let event = try #require(try ClaudeProtocol.decodeLine(line))
+        guard case let .result(result) = event else {
+            Issue.record("expected result, got \(event)")
+            return
+        }
+        #expect(result.isError == true)
+        #expect(result.subtype == "error_during_execution")
+        #expect(result.result == "boom")
+    }
+
+    @Test
     func resultContextPercentSumsLastIterationOverContextWindow() throws {
         // 1000 + 2000 + 500 + 500 = 4000 / 8000 = 50%
         let line = #"""

@@ -296,6 +296,18 @@ struct ClaudeStreamMonitorTests {
     }
 
     @Test
+    func stripANSIRemovesEscapeSequencesAndPreservesText() {
+        // Color + reset, common in `claude` CLI stderr.
+        let colored = "\u{001B}[31mAPI Error: 529\u{001B}[0m service unavailable"
+        #expect(ClaudeStreamMonitor.stripANSI(colored) == "API Error: 529 service unavailable")
+        // Cursor / clear-line escapes — also stripped.
+        let cursor = "\u{001B}[2KRetrying in 1s · attempt 4/10"
+        #expect(ClaudeStreamMonitor.stripANSI(cursor) == "Retrying in 1s · attempt 4/10")
+        // Plain text passes through unchanged.
+        #expect(ClaudeStreamMonitor.stripANSI("plain") == "plain")
+    }
+
+    @Test
     func hydrateSkipsNonMessageLines() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("claude-hydrate-skip-\(UUID().uuidString)")
