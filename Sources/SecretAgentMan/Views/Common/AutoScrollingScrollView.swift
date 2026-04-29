@@ -67,8 +67,16 @@ struct AutoScrollingScrollView<Content: View, Overlay: View, Trigger: Equatable>
                                 )
                         }
                     }
+                    // `MarkdownUI` settles bubble heights across multiple
+                    // layout passes after mount. An imperative initial
+                    // `scrollTo(.bottom)` races that growth and lands short.
+                    // `defaultScrollAnchor(.bottom)` makes SwiftUI keep the
+                    // content's bottom pinned to the viewport's bottom on
+                    // every content-size change, so the panel opens flush
+                    // at the bottom and stays there as layout settles —
+                    // without fighting user-driven scrolls.
+                    .defaultScrollAnchor(.bottom)
                     .onPreferenceChange(AutoScrollDistanceKey.self) { distanceFromBottom = $0 }
-                    .onAppear { scrollToBottom() }
                     .onChange(of: trigger) { _, _ in
                         if distanceFromBottom <= pinThreshold {
                             scrollToBottom()
