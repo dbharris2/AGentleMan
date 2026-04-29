@@ -419,12 +419,15 @@ extension ClaudeProtocol {
     /// usage/modelUsage shapes that drive the context-window indicator.
     struct ResultEvent: Decodable, Equatable {
         let isError: Bool?
+        let subtype: String?
+        let result: String?
         let sessionId: String?
         let modelUsage: [String: ModelUsage]?
         let usage: Usage?
 
         private enum CodingKeys: String, CodingKey {
             case isError = "is_error"
+            case subtype, result
             case sessionId = "session_id"
             case modelUsage, usage
         }
