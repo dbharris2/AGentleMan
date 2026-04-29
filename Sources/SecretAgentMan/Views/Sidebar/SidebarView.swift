@@ -195,8 +195,32 @@ struct SidebarView: View {
             }
             Divider()
             Button("Remove", role: .destructive) {
+                preselectFallbackBeforeRemoving(agent)
                 coordinator.removeAgent(agent.id)
             }
+        }
+    }
+
+    private func preselectFallbackBeforeRemoving(_ agent: Agent) {
+        let store = coordinator.store
+        guard store.selectedAgentId == agent.id else { return }
+        let collapsed = collapsedFolders
+        let isInOpenFolder: (Agent) -> Bool = { !collapsed.contains($0.folder.tildeAbbreviatedPath) }
+
+        let fromHistory = store.selectionHistory.reversed().first { id in
+            guard id != agent.id, let other = store.agents.first(where: { $0.id == id }) else {
+                return false
+            }
+            return isInOpenFolder(other)
+        }
+
+        let fallback = fromHistory ?? store.agents
+            .filter { $0.id != agent.id && isInOpenFolder($0) }
+            .min(by: { $0.createdAt < $1.createdAt })?
+            .id
+
+        if let fallback {
+            store.selectAgent(id: fallback)
         }
     }
 

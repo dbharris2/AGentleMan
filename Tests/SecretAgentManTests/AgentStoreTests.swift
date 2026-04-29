@@ -154,6 +154,61 @@ struct AgentStoreTests {
     }
 
     @Test
+    func selectAgentRecordsPreviousSelectionInHistory() {
+        let store = AgentStore(loadFromDisk: false)
+        let folder = URL(fileURLWithPath: "/tmp/project")
+        let a = Agent(name: "A", folder: folder, provider: .claude, sessionId: "a")
+        let b = Agent(name: "B", folder: folder, provider: .claude, sessionId: "b")
+        let c = Agent(name: "C", folder: folder, provider: .claude, sessionId: "c")
+        store.agents = [a, b, c]
+
+        store.selectAgent(id: a.id)
+        store.selectAgent(id: b.id)
+        store.selectAgent(id: c.id)
+
+        #expect(store.selectionHistory == [a.id, b.id])
+        #expect(store.selectedAgentId == c.id)
+    }
+
+    @Test
+    func selectAgentDedupesPreviousVisitsToSameAgent() {
+        let store = AgentStore(loadFromDisk: false)
+        let folder = URL(fileURLWithPath: "/tmp/project")
+        let a = Agent(name: "A", folder: folder, provider: .claude, sessionId: "a")
+        let b = Agent(name: "B", folder: folder, provider: .claude, sessionId: "b")
+        store.agents = [a, b]
+
+        store.selectAgent(id: a.id)
+        store.selectAgent(id: b.id)
+        store.selectAgent(id: a.id)
+        store.selectAgent(id: b.id)
+
+        // Each id appears at most once; most-recent-before-current sits at the end.
+        #expect(store.selectionHistory == [b.id, a.id])
+        #expect(store.selectedAgentId == b.id)
+    }
+
+    @Test
+    func removeAgentStripsIdFromSelectionHistory() {
+        let store = AgentStore(loadFromDisk: false)
+        let folder = URL(fileURLWithPath: "/tmp/project")
+        let a = Agent(name: "A", folder: folder, provider: .claude, sessionId: "a")
+        let b = Agent(name: "B", folder: folder, provider: .claude, sessionId: "b")
+        let c = Agent(name: "C", folder: folder, provider: .claude, sessionId: "c")
+        store.agents = [a, b, c]
+
+        store.selectAgent(id: a.id)
+        store.selectAgent(id: b.id)
+        store.selectAgent(id: c.id)
+        // history is now [a, b], selected is c
+
+        store.removeAgent(id: b.id)
+
+        #expect(!store.selectionHistory.contains(b.id))
+        #expect(store.selectionHistory == [a.id])
+    }
+
+    @Test
     func removeAgentKeepsFolderInStore() {
         let store = AgentStore(loadFromDisk: false)
         let folder = URL(fileURLWithPath: "/tmp/keepme")

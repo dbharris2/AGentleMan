@@ -12,6 +12,8 @@ final class AgentStore {
     var agents: [Agent] = []
     var folders: [URL] = []
     var selectedAgentId: UUID?
+    private(set) var selectionHistory: [UUID] = []
+    private let selectionHistoryLimit = 50
 
     static func persistenceURL(appSupportRoot: URL? = nil) -> URL {
         let dir = (appSupportRoot ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
@@ -56,6 +58,13 @@ final class AgentStore {
 
     func selectAgent(id: UUID?) {
         guard selectedAgentId != id else { return }
+        if let previous = selectedAgentId {
+            selectionHistory.removeAll { $0 == previous }
+            selectionHistory.append(previous)
+            if selectionHistory.count > selectionHistoryLimit {
+                selectionHistory.removeFirst(selectionHistory.count - selectionHistoryLimit)
+            }
+        }
         selectedAgentId = id
         persistSelectedAgentId()
     }
@@ -160,6 +169,7 @@ final class AgentStore {
 
     func removeAgent(id: UUID) {
         agents.removeAll { $0.id == id }
+        selectionHistory.removeAll { $0 == id }
         if selectedAgentId == id {
             selectAgent(id: agents.first?.id)
         }
