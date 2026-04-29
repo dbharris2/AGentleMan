@@ -14,97 +14,142 @@ struct SessionChatView: View {
 
     @State private var expandedGroups: Set<String> = []
     @State private var visibleCount = 50
+    @State private var distanceFromBottom: CGFloat = 0
+    @State private var hasUnreadBelow: Bool = false
 
     private static let pageSize = 50
+    /// Scroll-distance below which we consider the user "pinned" to the bottom
+    /// and continue auto-scrolling on new content. Generous enough to absorb
+    /// a single line of streaming growth between layout passes.
+    private static let pinThreshold: CGFloat = 60
+    /// Show the floating "Go to bottom" button only when the user has scrolled
+    /// far enough that returning by hand would be tedious.
+    private static let goToBottomThreshold: CGFloat = 200
 
-    private var allSections: [TranscriptSection] {
-        TranscriptSection.group(transcript)
+    private var assistantMessageCount: Int {
+        transcript.count(where: { $0.kind == .assistantMessage })
     }
 
-    private var displayedSections: ArraySlice<TranscriptSection> {
-        let all = allSections
-        let start = max(0, all.count - visibleCount)
-        return all[start...]
-    }
-
-    private var hasMoreAbove: Bool {
-        allSections.count > visibleCount
+    private var isPinnedToBottom: Bool {
+        distanceFromBottom <= Self.pinThreshold
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            let scrollToBottom = { proxy.scrollTo("bottom", anchor: .bottom) }
+        let allSections = TranscriptSection.group(transcript)
+        let displayedStart = max(0, allSections.count - visibleCount)
+        let displayedSections = allSections[displayedStart...]
+        let hasMoreAbove = allSections.count > visibleCount
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.xxl) {
-                    if transcript.isEmpty, streaming == nil {
-                        Text(emptyStateText)
-                            .scaledFont(size: 13)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
-                        if hasMoreAbove {
-                            Button {
-                                let anchorId = displayedSections.first?.id
-                                visibleCount += Self.pageSize
-                                if let anchorId {
-                                    DispatchQueue.main.async {
-                                        proxy.scrollTo(anchorId, anchor: .top)
-                                    }
+        return AutoScrollingScrollView(
+            trigger: AutoScrollSignal(
+                transcriptCount: transcript.count,
+                streamingLength: streaming?.count,
+                isThinking: isThinking,
+                hasPendingCard: hasPendingCard
+            ),
+            pinThreshold: Self.pinThreshold,
+            distanceFromBottom: $distanceFromBottom
+        ) { proxy in
+            VStack(alignment: .leading, spacing: Spacing.xxl) {
+                if transcript.isEmpty, streaming == nil {
+                    Text(emptyStateText)
+                        .scaledFont(size: 13)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    if hasMoreAbove {
+                        Button {
+                            let anchorId = displayedSections.first?.id
+                            visibleCount += Self.pageSize
+                            if let anchorId {
+                                DispatchQueue.main.async {
+                                    proxy.scrollTo(anchorId, anchor: .top)
                                 }
-                            } label: {
-                                Text("Load earlier messages")
-                                    .scaledFont(size: 12)
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, Spacing.md)
                             }
-                            .buttonStyle(.plain)
+                        } label: {
+                            Text("Load earlier messages")
+                                .scaledFont(size: 12)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, Spacing.md)
                         }
-
-                        ForEach(displayedSections) { section in
-                            switch section {
-                            case let .single(item):
-                                if item.kind == .thought {
-                                    thoughtDisclosureView(items: [item], groupId: "thought-\(item.id)")
-                                } else if item.metadata?.toolName == "TodoWrite" {
-                                    SessionTodoCard(text: item.text, fontScale: fontScale)
-                                } else {
-                                    SessionTranscriptBubble(
-                                        kind: item.kind,
-                                        text: item.text,
-                                        fontScale: fontScale,
-                                        images: item.imageData
-                                    )
-                                }
-                            case let .systemGroup(items, groupId):
-                                systemGroupView(items: items, groupId: groupId)
-                            case let .thoughtGroup(items, groupId):
-                                thoughtDisclosureView(items: items, groupId: groupId)
-                            }
-                        }
+                        .buttonStyle(.plain)
                     }
 
-                    if let text = streaming, !text.isEmpty {
-                        SessionStreamingBubble(text: text, fontScale: fontScale)
-                    } else if isThinking {
-                        SessionThinkingBubble(providerName: providerName, activeTool: activeTool)
+                    ForEach(displayedSections) { section in
+                        switch section {
+                        case let .single(item):
+                            if item.kind == .thought {
+                                thoughtDisclosureView(items: [item], groupId: "thought-\(item.id)")
+                            } else if item.metadata?.toolName == "TodoWrite" {
+                                SessionTodoCard(text: item.text, fontScale: fontScale)
+                            } else {
+                                SessionTranscriptBubble(
+                                    kind: item.kind,
+                                    text: item.text,
+                                    fontScale: fontScale,
+                                    images: item.imageData
+                                )
+                            }
+                        case let .systemGroup(items, groupId):
+                            systemGroupView(items: items, groupId: groupId)
+                        case let .thoughtGroup(items, groupId):
+                            thoughtDisclosureView(items: items, groupId: groupId)
+                        }
                     }
-
-                    pendingCards()
-
-                    Color.clear.frame(height: 1).id("bottom")
                 }
+
+                if let text = streaming, !text.isEmpty {
+                    SessionStreamingBubble(text: text, fontScale: fontScale)
+                } else if isThinking {
+                    SessionThinkingBubble(providerName: providerName, activeTool: activeTool)
+                }
+
+                pendingCards()
+            }
+            .padding(Spacing.xxl)
+        } overlay: { distance, scrollToBottom in
+            if distance > Self.goToBottomThreshold {
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        scrollToBottom()
+                    }
+                    hasUnreadBelow = false
+                } label: {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 32, height: 32)
+                        .background(.regularMaterial, in: Circle())
+                        .overlay(Circle().strokeBorder(Color.secondary.opacity(0.25), lineWidth: 0.5))
+                        .overlay(alignment: .topTrailing) {
+                            if hasUnreadBelow {
+                                Circle()
+                                    .fill(.red)
+                                    .frame(width: 9, height: 9)
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(Color(NSColor.windowBackgroundColor), lineWidth: 1.5)
+                                    )
+                                    .offset(x: 2, y: -2)
+                            }
+                        }
+                        .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
                 .padding(Spacing.xxl)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            .onAppear {
-                visibleCount = Self.pageSize
-                scrollToBottom()
+        }
+        .animation(.easeInOut(duration: 0.18), value: distanceFromBottom > Self.goToBottomThreshold)
+        .onAppear { visibleCount = Self.pageSize }
+        .onChange(of: assistantMessageCount) { old, new in
+            if new > old, !isPinnedToBottom {
+                hasUnreadBelow = true
             }
-            .onChange(of: streaming) { _, _ in scrollToBottom() }
-            .onChange(of: transcript.count) { _, _ in scrollToBottom() }
-            .onChange(of: isThinking) { _, thinking in if thinking { scrollToBottom() } }
-            .onChange(of: hasPendingCard) { _, has in if has { scrollToBottom() } }
+        }
+        .onChange(of: isPinnedToBottom) { _, pinned in
+            if pinned { hasUnreadBelow = false }
         }
     }
 
@@ -362,4 +407,18 @@ private extension Sequence where Element: Hashable {
         var seen: Set<Element> = []
         return filter { seen.insert($0).inserted }
     }
+}
+
+// MARK: - Auto-scroll trigger
+
+/// Bundles the heterogeneous signals that should pin-aware auto-scroll the
+/// chat into a single Equatable value so we can pass it through
+/// `AutoScrollingScrollView`'s generic trigger parameter. Streaming is
+/// represented by its character count rather than the full string so that
+/// per-chunk Equatable comparisons stay O(1) instead of O(N).
+private struct AutoScrollSignal: Equatable {
+    let transcriptCount: Int
+    let streamingLength: Int?
+    let isThinking: Bool
+    let hasPendingCard: Bool
 }
