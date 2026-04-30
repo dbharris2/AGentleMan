@@ -7,8 +7,6 @@ struct GeminiSessionPanelView: View {
 
     let agent: Agent
 
-    @State private var draft = ""
-    @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
     private var snapshot: AgentSessionSnapshot? {
@@ -77,70 +75,14 @@ struct GeminiSessionPanelView: View {
                 })
             }
         } composer: {
-            composer
+            GeminiComposerView(
+                agent: agent,
+                currentModelName: currentModelName,
+                availableModes: availableModes,
+                currentModeId: currentModeId,
+                composerFocused: $composerFocused
+            )
         }
-    }
-
-    private var composer: some View {
-        SessionComposer(
-            draft: $draft,
-            pendingImages: $pendingImages,
-            composerFocused: $composerFocused,
-            fontScale: fontScale,
-            statusText: "",
-            statusColor: .secondary,
-            onKeyPress: handleComposerKeyPress,
-            onDraftChange: {}
-        ) {
-            EmptyView()
-        } trailingControls: {
-            HStack(spacing: 6) {
-                ComposerPill(text: currentModelName)
-                if !availableModes.isEmpty {
-                    Menu {
-                        ForEach(availableModes) { mode in
-                            Button {
-                                coordinator.setGeminiMode(for: agent.id, modeId: mode.id)
-                            } label: {
-                                if mode.id == currentModeId {
-                                    Label(mode.name, systemImage: "checkmark")
-                                } else {
-                                    Text(mode.name)
-                                }
-                            }
-                        }
-                    } label: {
-                        ComposerPill(text: currentModeId.flatMap { id in
-                            availableModes.first(where: { $0.id == id })?.name
-                        } ?? "Mode")
-                    }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
-                }
-            }
-        }
-    }
-
-    private func handleComposerKeyPress(_ keyPress: KeyPress) -> KeyPress.Result {
-        if keyPress.key == .return {
-            if keyPress.modifiers.contains(.shift) {
-                return .ignored
-            }
-            sendDraft()
-            return .handled
-        }
-        return .ignored
-    }
-
-    private func sendDraft() {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !pendingImages.isEmpty else { return }
-        let sendText = text.isEmpty ? "[Image]" : text
-        let imageData = pendingImages.map(\.data)
-        coordinator.sendGeminiMessage(for: agent.id, text: sendText, imageData: imageData)
-        draft = ""
-        pendingImages.removeAll()
     }
 
     /// Renders Gemini's typed approval actions directly. Allow_once is the
@@ -196,6 +138,74 @@ struct GeminiSessionPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.yellow.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+/// Owns the per-keystroke draft state so typing only invalidates the composer
+/// subtree — the panel body (which renders the full transcript via MarkdownUI)
+/// stays put.
+private struct GeminiComposerView: View {
+    @Environment(AppCoordinator.self) private var coordinator
+    @Environment(\.fontScale) private var fontScale
+
+    let agent: Agent
+    let currentModelName: String
+    let availableModes: [SessionModeInfo]
+    let currentModeId: String?
+    var composerFocused: FocusState<Bool>.Binding
+
+    @State private var draft = ""
+    @State private var pendingImages: [PendingImage] = []
+
+    var body: some View {
+        SessionComposer(
+            draft: $draft,
+            pendingImages: $pendingImages,
+            composerFocused: composerFocused,
+            fontScale: fontScale,
+            statusText: "",
+            statusColor: .secondary,
+            onKeyPress: { handleComposerSubmitKeyPress($0, send: sendDraft) },
+            onDraftChange: {}
+        ) {
+            EmptyView()
+        } trailingControls: {
+            HStack(spacing: 6) {
+                ComposerPill(text: currentModelName)
+                if !availableModes.isEmpty {
+                    Menu {
+                        ForEach(availableModes) { mode in
+                            Button {
+                                coordinator.setGeminiMode(for: agent.id, modeId: mode.id)
+                            } label: {
+                                if mode.id == currentModeId {
+                                    Label(mode.name, systemImage: "checkmark")
+                                } else {
+                                    Text(mode.name)
+                                }
+                            }
+                        }
+                    } label: {
+                        ComposerPill(text: currentModeId.flatMap { id in
+                            availableModes.first(where: { $0.id == id })?.name
+                        } ?? "Mode")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                }
+            }
+        }
+    }
+
+    private func sendDraft() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty || !pendingImages.isEmpty else { return }
+        let sendText = text.isEmpty ? "[Image]" : text
+        let imageData = pendingImages.map(\.data)
+        coordinator.sendGeminiMessage(for: agent.id, text: sendText, imageData: imageData)
+        draft = ""
+        pendingImages.removeAll()
     }
 }
 

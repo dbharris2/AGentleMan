@@ -7,8 +7,6 @@ struct CodexSessionPanelView: View {
 
     let agent: Agent
 
-    @State private var draft = ""
-    @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
     private var snapshot: AgentSessionSnapshot? {
@@ -49,8 +47,6 @@ struct CodexSessionPanelView: View {
         return raw.flatMap(CodexCollaborationMode.init(rawValue:)) ?? .default
     }
 
-    @State private var showingUsagePopover = false
-
     var body: some View {
         SessionPanelShell(agent: agent, composerFocused: $composerFocused) {
             SessionChatView(
@@ -85,85 +81,13 @@ struct CodexSessionPanelView: View {
                 })
             }
         } composer: {
-            composer
+            CodexComposerView(
+                agent: agent,
+                currentModelName: currentModelName,
+                currentCollaborationMode: currentCollaborationMode,
+                composerFocused: $composerFocused
+            )
         }
-    }
-
-    private var composer: some View {
-        SessionComposer(
-            draft: $draft,
-            pendingImages: $pendingImages,
-            composerFocused: $composerFocused,
-            fontScale: fontScale,
-            statusText: "",
-            statusColor: .secondary,
-            onKeyPress: handleComposerKeyPress,
-            onDraftChange: {}
-        ) {
-            EmptyView()
-        } trailingControls: {
-            HStack(spacing: 6) {
-                ComposerPill(text: currentModelName)
-                ComposerModePickerButton(
-                    title: "Mode",
-                    modes: CodexCollaborationMode.allCases,
-                    currentMode: currentCollaborationMode,
-                    label: { $0.label },
-                    shortcutKey: "m",
-                    shortcutModifiers: [.command, .shift],
-                    shortcutLabel: "⌘⇧M"
-                ) { mode in
-                    coordinator.setCodexCollaborationMode(for: agent.id, mode: mode)
-                }
-                if let limits = coordinator.usageMonitor.rateLimits[.codex] {
-                    usageRingButton(limits: limits)
-                }
-            }
-        }
-    }
-
-    private func usageRingButton(limits: AgentRateLimits) -> some View {
-        Button {
-            showingUsagePopover.toggle()
-        } label: {
-            UsageRing(percent: limits.shortWindow.usedPercent)
-        }
-        .buttonStyle(.plain)
-        .help("API Usage")
-        .popover(isPresented: $showingUsagePopover) {
-            UsagePopover(limits: limits, provider: .codex)
-        }
-    }
-
-    private func handleComposerKeyPress(_ keyPress: KeyPress) -> KeyPress.Result {
-        if keyPress.key == .return {
-            if keyPress.modifiers.contains(.shift) {
-                return .ignored
-            }
-            sendDraft()
-            return .handled
-        }
-        return .ignored
-    }
-
-    private func sendDraft() {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !pendingImages.isEmpty else { return }
-        let imageData = pendingImages.map(\.data)
-        let imagePaths = pendingImages.compactMap { img -> String? in
-            let path = FileManager.default.temporaryDirectory
-                .appendingPathComponent("codex-image-\(UUID().uuidString).png").path
-            return FileManager.default.createFile(atPath: path, contents: img.data) ? path : nil
-        }
-        let sendText = text.isEmpty ? "[Image]" : text
-        coordinator.codexMonitor.recordSentUserMessage(
-            for: agent.id,
-            text: sendText,
-            imageData: imageData
-        )
-        coordinator.sendCodexMessage(for: agent.id, text: sendText, imagePaths: imagePaths)
-        draft = ""
-        pendingImages.removeAll()
     }
 
     private func approvalCard(_ prompt: ApprovalPrompt) -> some View {
@@ -207,5 +131,88 @@ struct CodexSessionPanelView: View {
                 }
             }
         }
+    }
+}
+
+/// Owns the per-keystroke draft state so typing only invalidates the composer
+/// subtree — the panel body (which renders the full transcript via MarkdownUI)
+/// stays put.
+private struct CodexComposerView: View {
+    @Environment(AppCoordinator.self) private var coordinator
+    @Environment(\.fontScale) private var fontScale
+
+    let agent: Agent
+    let currentModelName: String
+    let currentCollaborationMode: CodexCollaborationMode
+    var composerFocused: FocusState<Bool>.Binding
+
+    @State private var draft = ""
+    @State private var pendingImages: [PendingImage] = []
+    @State private var showingUsagePopover = false
+
+    var body: some View {
+        SessionComposer(
+            draft: $draft,
+            pendingImages: $pendingImages,
+            composerFocused: composerFocused,
+            fontScale: fontScale,
+            statusText: "",
+            statusColor: .secondary,
+            onKeyPress: { handleComposerSubmitKeyPress($0, send: sendDraft) },
+            onDraftChange: {}
+        ) {
+            EmptyView()
+        } trailingControls: {
+            HStack(spacing: 6) {
+                ComposerPill(text: currentModelName)
+                ComposerModePickerButton(
+                    title: "Mode",
+                    modes: CodexCollaborationMode.allCases,
+                    currentMode: currentCollaborationMode,
+                    label: { $0.label },
+                    shortcutKey: "m",
+                    shortcutModifiers: [.command, .shift],
+                    shortcutLabel: "⌘⇧M"
+                ) { mode in
+                    coordinator.setCodexCollaborationMode(for: agent.id, mode: mode)
+                }
+                if let limits = coordinator.usageMonitor.rateLimits[.codex] {
+                    usageRingButton(limits: limits)
+                }
+            }
+        }
+    }
+
+    private func usageRingButton(limits: AgentRateLimits) -> some View {
+        Button {
+            showingUsagePopover.toggle()
+        } label: {
+            UsageRing(percent: limits.shortWindow.usedPercent)
+        }
+        .buttonStyle(.plain)
+        .help("API Usage")
+        .popover(isPresented: $showingUsagePopover) {
+            UsagePopover(limits: limits, provider: .codex)
+        }
+    }
+
+    private func sendDraft() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty || !pendingImages.isEmpty else { return }
+        let imageData = pendingImages.map(\.data)
+        let imagePaths = pendingImages.compactMap { img -> String? in
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("codex-image-\(UUID().uuidString).png")
+            return (try? img.data.write(to: url)) != nil ? url.path : nil
+        }
+        let sendText = text.isEmpty ? "[Image]" : text
+        coordinator.codexMonitor.recordSentUserMessage(
+            for: agent.id,
+            text: sendText,
+            imageData: imageData
+        )
+        coordinator.sendCodexMessage(for: agent.id, text: sendText, imagePaths: imagePaths)
+        draft = ""
+        pendingImages.removeAll()
     }
 }
