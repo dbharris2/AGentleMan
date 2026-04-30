@@ -62,6 +62,11 @@ struct ChangesView: View {
                 )
             }
         }
+        .onChange(of: changes) { _, newChanges in
+            if let selected = selectedFile, !newChanges.contains(where: { $0.path == selected }) {
+                selectedFile = nil
+            }
+        }
     }
 
     private var fileList: some View {
