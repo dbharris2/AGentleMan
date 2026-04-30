@@ -263,6 +263,17 @@ struct PendingImage: Identifiable {
     }
 }
 
+/// Standard "Return sends, Shift-Return inserts newline" key handling for
+/// composer text editors. Use as the entire `onKeyPress` for simple composers,
+/// or as a fall-through after handling provider-specific keys (slash menus,
+/// etc.).
+func handleComposerSubmitKeyPress(_ keyPress: KeyPress, send: () -> Void) -> KeyPress.Result {
+    guard keyPress.key == .return else { return .ignored }
+    if keyPress.modifiers.contains(.shift) { return .ignored }
+    send()
+    return .handled
+}
+
 struct SessionComposer<Suggestions: View, TrailingControls: View>: View {
     @Binding var draft: String
     @Binding var pendingImages: [PendingImage]

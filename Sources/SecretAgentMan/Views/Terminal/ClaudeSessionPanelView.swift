@@ -7,9 +7,6 @@ struct ClaudeSessionPanelView: View {
 
     let agent: Agent
 
-    @State private var draft = ""
-    @State private var slashSelectionIndex = 0
-    @State private var pendingImages: [PendingImage] = []
     @FocusState private var composerFocused: Bool
 
     private var snapshot: AgentSessionSnapshot? {
@@ -40,15 +37,6 @@ struct ClaudeSessionPanelView: View {
         agent.state == .active && streaming == nil
     }
 
-    private var slashSuggestions: [SessionSlashCommand] {
-        let stripped = draft.replacingOccurrences(of: "\n", with: "")
-        guard stripped.hasPrefix("/"), !stripped.contains(" ") else { return [] }
-        let query = String(stripped.dropFirst()).lowercased()
-        let commands = snapshot?.metadata.slashCommands ?? []
-        if query.isEmpty { return commands }
-        return commands.filter { $0.name.lowercased().hasPrefix(query) }
-    }
-
     var body: some View {
         SessionPanelShell(agent: agent, composerFocused: $composerFocused) {
             SessionChatView(
@@ -68,7 +56,8 @@ struct ClaudeSessionPanelView: View {
                             options: pendingElicitation.questions.first?.options ?? []
                         ) { label in
                             coordinator.answerClaudeElicitation(for: agent.id, answer: label)
-                            draft = ""
+                            // Clear any half-typed custom answer in the composer.
+                            coordinator.composerInsert = ""
                         }
                     }
 
@@ -78,7 +67,96 @@ struct ClaudeSessionPanelView: View {
                 })
             }
         } composer: {
-            composer
+            ClaudeComposerView(
+                agent: agent,
+                slashCommands: snapshot?.metadata.slashCommands ?? [],
+                displayModelName: snapshot?.metadata.displayModelName ?? "Claude",
+                permissionMode: snapshot?.metadata.permissionMode
+                    ?? ClaudeStreamMonitor.defaultPermissionMode,
+                pendingElicitation: pendingElicitation,
+                composerFocused: $composerFocused
+            )
+        }
+    }
+
+    private func approvalCard(_ prompt: ApprovalPrompt) -> some View {
+        SessionApprovalCard(
+            title: "Tool Approval: \(prompt.title)",
+            detail: prompt.message,
+            approveTitle: "Allow",
+            declineTitle: "Deny",
+            supportsDecisions: true,
+            unsupportedText: "",
+            onApprove: {
+                coordinator.answerClaudeApproval(for: agent.id, accept: true)
+            },
+            onDecline: {
+                coordinator.answerClaudeApproval(for: agent.id, accept: false)
+            },
+            onApproveAndSwitchMode: { mode in
+                coordinator.answerClaudeApproval(for: agent.id, accept: true)
+                coordinator.claudeMonitor.setPermissionMode(for: agent.id, mode: mode)
+            }
+        )
+    }
+}
+
+/// Owns the per-keystroke draft state so typing only invalidates the composer
+/// subtree — the panel body (which renders the full transcript via MarkdownUI)
+/// stays put.
+private struct ClaudeComposerView: View {
+    @Environment(AppCoordinator.self) private var coordinator
+    @Environment(\.fontScale) private var fontScale
+    @Environment(\.appTheme) private var theme
+
+    let agent: Agent
+    let slashCommands: [SessionSlashCommand]
+    let displayModelName: String
+    let permissionMode: String
+    let pendingElicitation: UserInputPrompt?
+    var composerFocused: FocusState<Bool>.Binding
+
+    @State private var draft = ""
+    @State private var pendingImages: [PendingImage] = []
+    @State private var slashSelectionIndex = 0
+
+    private var slashSuggestions: [SessionSlashCommand] {
+        let stripped = draft.replacingOccurrences(of: "\n", with: "")
+        guard stripped.hasPrefix("/"), !stripped.contains(" ") else { return [] }
+        let query = String(stripped.dropFirst()).lowercased()
+        if query.isEmpty { return slashCommands }
+        return slashCommands.filter { $0.name.lowercased().hasPrefix(query) }
+    }
+
+    var body: some View {
+        SessionComposer(
+            draft: $draft,
+            pendingImages: $pendingImages,
+            composerFocused: composerFocused,
+            fontScale: fontScale,
+            statusText: pendingElicitation != nil ? "Answering question..." : "",
+            statusColor: pendingElicitation != nil ? theme.yellow : .secondary,
+            onKeyPress: handleComposerKeyPress,
+            onDraftChange: { slashSelectionIndex = 0 }
+        ) {
+            if !slashSuggestions.isEmpty {
+                slashCommandList
+            }
+        } trailingControls: {
+            HStack(spacing: 6) {
+                ComposerPill(text: displayModelName)
+                ComposerModePickerButton(
+                    title: "Mode",
+                    modes: ClaudeStreamMonitor.permissionModes,
+                    currentMode: permissionMode,
+                    label: { $0 },
+                    shortcutKey: "m",
+                    shortcutModifiers: [.command, .shift],
+                    shortcutLabel: "⌘⇧M"
+                ) { mode in
+                    coordinator.claudeMonitor.setPermissionMode(for: agent.id, mode: mode)
+                }
+            }
         }
         .onChange(of: coordinator.composerInsert) { _, text in
             if let text {
@@ -87,8 +165,6 @@ struct ClaudeSessionPanelView: View {
             }
         }
     }
-
-    // MARK: - Slash Command Suggestions
 
     private var slashCommandList: some View {
         ScrollViewReader { proxy in
@@ -132,43 +208,6 @@ struct ClaudeSessionPanelView: View {
         .background(theme.surface)
     }
 
-    // MARK: - Composer
-
-    private var composer: some View {
-        SessionComposer(
-            draft: $draft,
-            pendingImages: $pendingImages,
-            composerFocused: $composerFocused,
-            fontScale: fontScale,
-            statusText: pendingElicitation != nil ? "Answering question..." : "",
-            statusColor: pendingElicitation != nil ? theme.yellow : .secondary,
-            onKeyPress: handleComposerKeyPress,
-            onDraftChange: { slashSelectionIndex = 0 }
-        ) {
-            if !slashSuggestions.isEmpty {
-                slashCommandList
-            }
-        } trailingControls: {
-            HStack(spacing: 6) {
-                ComposerPill(
-                    text: snapshot?.metadata.displayModelName ?? "Claude"
-                )
-                ComposerModePickerButton(
-                    title: "Mode",
-                    modes: ClaudeStreamMonitor.permissionModes,
-                    currentMode: snapshot?.metadata.permissionMode
-                        ?? ClaudeStreamMonitor.defaultPermissionMode,
-                    label: { $0 },
-                    shortcutKey: "m",
-                    shortcutModifiers: [.command, .shift],
-                    shortcutLabel: "⌘⇧M"
-                ) { mode in
-                    coordinator.claudeMonitor.setPermissionMode(for: agent.id, mode: mode)
-                }
-            }
-        }
-    }
-
     private func handleComposerKeyPress(_ keyPress: KeyPress) -> KeyPress.Result {
         let suggestions = slashSuggestions
         if !suggestions.isEmpty {
@@ -191,14 +230,7 @@ struct ClaudeSessionPanelView: View {
                 return .handled
             }
         }
-        if keyPress.key == .return {
-            if keyPress.modifiers.contains(.shift) {
-                return .ignored
-            }
-            sendDraft()
-            return .handled
-        }
-        return .ignored
+        return handleComposerSubmitKeyPress(keyPress, send: sendDraft)
     }
 
     private func sendDraft() {
@@ -208,30 +240,13 @@ struct ClaudeSessionPanelView: View {
             coordinator.answerClaudeElicitation(for: agent.id, answer: text)
         } else {
             let images = pendingImages
-            coordinator.sendClaudeMessage(for: agent.id, text: text.isEmpty ? "[Image]" : text, images: images.map { ($0.data, $0.mediaType) })
+            coordinator.sendClaudeMessage(
+                for: agent.id,
+                text: text.isEmpty ? "[Image]" : text,
+                images: images.map { ($0.data, $0.mediaType) }
+            )
         }
         draft = ""
         pendingImages.removeAll()
-    }
-
-    private func approvalCard(_ prompt: ApprovalPrompt) -> some View {
-        SessionApprovalCard(
-            title: "Tool Approval: \(prompt.title)",
-            detail: prompt.message,
-            approveTitle: "Allow",
-            declineTitle: "Deny",
-            supportsDecisions: true,
-            unsupportedText: "",
-            onApprove: {
-                coordinator.answerClaudeApproval(for: agent.id, accept: true)
-            },
-            onDecline: {
-                coordinator.answerClaudeApproval(for: agent.id, accept: false)
-            },
-            onApproveAndSwitchMode: { mode in
-                coordinator.answerClaudeApproval(for: agent.id, accept: true)
-                coordinator.claudeMonitor.setPermissionMode(for: agent.id, mode: mode)
-            }
-        )
     }
 }
