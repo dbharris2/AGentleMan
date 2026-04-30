@@ -4,34 +4,93 @@ struct DiffView: View {
     let diffText: String
     @Environment(\.fontScale) private var fontScale
     @Environment(\.appTheme) private var theme
+    @State private var collapsedFiles: Set<String> = []
 
-    private var parsedLines: [(line: String, kind: LineKind, lang: String?)] {
-        var result: [(String, LineKind, String?)] = []
+    private struct ParsedFile: Identifiable {
+        var id: String {
+            headerLine
+        }
+
+        let headerLine: String
+        var otherLines: [(line: String, kind: LineKind, lang: String?)]
+    }
+
+    private var groupedFiles: [ParsedFile] {
+        var files: [ParsedFile] = []
+        var currentFile: ParsedFile?
         var currentLang: String?
 
         for line in diffText.components(separatedBy: "\n") {
             let kind = classify(line)
             if kind == .fileHeader {
+                if let current = currentFile {
+                    files.append(current)
+                }
+                currentFile = ParsedFile(headerLine: line, otherLines: [])
                 if let ext = SyntaxHighlighter.extensionFromDiffHeader(line) {
                     currentLang = SyntaxHighlighter.language(forExtension: ext)
                 }
+            } else if currentFile != nil {
+                currentFile?.otherLines.append((line, kind, currentLang))
+            } else {
+                // Content before first file header (rare for git diffs)
+                currentFile = ParsedFile(headerLine: "diff (meta)", otherLines: [(line, .meta, nil)])
             }
-            result.append((line, kind, currentLang))
         }
-        return result
+        if let current = currentFile {
+            files.append(current)
+        }
+        return files
     }
 
     var body: some View {
         ScrollView(.vertical) {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(parsedLines.enumerated()), id: \.offset) { _, entry in
-                    diffLine(entry.line, kind: entry.kind, lang: entry.lang)
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                ForEach(groupedFiles) { file in
+                    Section(header: stickyHeader(for: file)) {
+                        if !collapsedFiles.contains(file.id) {
+                            ForEach(Array(file.otherLines.enumerated()), id: \.offset) { _, entry in
+                                diffLine(entry.line, kind: entry.kind, lang: entry.lang)
+                            }
+                        }
+                    }
                 }
             }
             .padding(.vertical, Spacing.sm)
         }
         .background(theme.background)
         .textSelection(.enabled)
+    }
+
+    private func stickyHeader(for file: ParsedFile) -> some View {
+        Button {
+            if collapsedFiles.contains(file.id) {
+                collapsedFiles.remove(file.id)
+            } else {
+                collapsedFiles.insert(file.id)
+            }
+        } label: {
+            HStack {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .rotationEffect(.degrees(collapsedFiles.contains(file.id) ? 0 : 90))
+                    .foregroundStyle(theme.foreground.opacity(0.5))
+
+                Text(file.headerLine)
+                    .scaledFont(size: 12, weight: .bold, design: .monospaced)
+                    .foregroundStyle(theme.foreground)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, Spacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.surface.opacity(0.95))
+            .overlay(alignment: .bottom) {
+                Divider()
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -42,14 +101,8 @@ struct DiffView: View {
     ) -> some View {
         switch kind {
         case .fileHeader:
-            Text(line)
-                .scaledFont(size: 12, weight: .bold, design: .monospaced)
-                .foregroundStyle(theme.foreground)
-                .padding(.horizontal, Spacing.lg)
-                .padding(.top, Spacing.xxl)
-                .padding(.bottom, Spacing.xs)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(theme.foreground.opacity(0.08))
+            // Rendered separately as a pinned Section header; never reached via diffLine.
+            EmptyView()
 
         case .hunkHeader:
             Text(line)
